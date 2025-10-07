@@ -93,9 +93,11 @@ exports.getClubByClubId = async (req, res) => {
 
 // Create new club
 exports.createClub = async (req, res) => {
-  const { name, isActive } = req.body;
+  const { name, mobileNumbers, address, isActive } = req.body;
 
   try {
+   
+    
     // Check for duplicate club name
     const existingClub = await Club.findOne({ name });
     if (existingClub) {
@@ -108,10 +110,14 @@ exports.createClub = async (req, res) => {
 
     const club = new Club({
       name,
+      mobileNumbers: mobileNumbers || [],
+      address: address || {},
       isActive: isActive !== undefined ? isActive : true
     });
 
+
     await club.save();
+
 
     const newClub = await Club.findById(club._id)
       .select('-__v');
@@ -123,8 +129,10 @@ exports.createClub = async (req, res) => {
     });
   } catch (error) {
     console.error('Create Club Error:', error.message);
+    console.error('Full error:', error);
     
     if (error.name === 'ValidationError') {
+      console.log('Validation errors:', error.errors);
       const errors = Object.values(error.errors).map(err => ({
         field: err.path,
         message: err.message
@@ -144,7 +152,6 @@ exports.createClub = async (req, res) => {
     });
   }
 };
-
 // Update club by ID
 exports.updateClubById = async (req, res) => {
   const { name, isActive } = req.body;
