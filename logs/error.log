@@ -1,0 +1,1 @@
+{"level":"error","message":"Failed to connect to MongoDB app.listen is not a function","stack":"TypeError: app.listen is not a function\n    at C:\\Users\\kkabh\\OneDrive\\Desktop\\Abijith\\Codeedex\\project_x_backend\\index.js:14:9\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)","timestamp":"2025-10-07T04:38:00.526Z"}
