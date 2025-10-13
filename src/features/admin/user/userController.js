@@ -17,41 +17,6 @@ exports.createUser = async (req, res) => {
       isActive = true
     } = req.body;
 
-    // Validate required fields
-    if (!name) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: [{ field: 'name', message: 'Name is required' }]
-      });
-    }
-
-    if (!club) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: [{ field: 'club', message: 'Club is required' }]
-      });
-    }
-
-    // Validate club exists (using the same validation as in schema)
-    try {
-      const clubExists = await mongoose.model('Club').findById(club);
-      if (!clubExists) {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          errors: [{ field: 'club', message: 'Invalid club ID. Club does not exist.' }]
-        });
-      }
-    } catch (error) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: [{ field: 'club', message: 'Invalid club ID format' }]
-      });
-    }
-
     // Check for duplicate mobile number if provided
     if (mobile) {
       const existingUser = await User.findOne({ mobile });
@@ -62,15 +27,6 @@ exports.createUser = async (req, res) => {
           errors: [{ field: 'mobile', message: 'Mobile number already exists' }]
         });
       }
-    }
-
-    // Validate name length
-    if (name.length < 3) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: [{ field: 'name', message: 'Name must be at least 3 characters long' }]
-      });
     }
 
     // Validate mobile format if provided
@@ -119,7 +75,7 @@ exports.createUser = async (req, res) => {
     // Fetch the created user without sensitive fields
     const createdUser = await User.findById(newUser._id)
       .select('-__v')
-      .populate('club', 'name'); // Optionally populate club name
+      .populate('club', 'name');
 
     res.status(201).json({
       success: true,
@@ -161,12 +117,12 @@ exports.createUser = async (req, res) => {
   }
 };
 
-// Get all users (for admin)
+// Keep other functions (getAllUsers, getUserById, updateUserById, deleteUserById) the same
 exports.getAllUsers = async (req, res) => {
   try {
     const users = await User.find()
       .select('-__v')
-      .populate('club', 'name') // Optionally populate club name
+      .populate('club', 'name')
       .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -189,7 +145,7 @@ exports.getUserById = async (req, res) => {
   try {
     const user = await User.findById(req.params.userId)
       .select('-__v')
-      .populate('club', 'name'); // Optionally populate club name
+      .populate('club', 'name');
 
     if (!user) {
       return res.status(404).json({
@@ -214,7 +170,6 @@ exports.getUserById = async (req, res) => {
   }
 };
 
-// Update user by ID (admin access)
 exports.updateUserById = async (req, res) => {
   const {
     name,
@@ -222,6 +177,7 @@ exports.updateUserById = async (req, res) => {
     club,
     country,
     dob,
+    passport,
     gender,
     mobile,
     level,
@@ -252,30 +208,11 @@ exports.updateUserById = async (req, res) => {
       }
     }
 
-    // Validate club exists if provided
-    if (club && club !== user.club.toString()) {
-      try {
-        const clubExists = await mongoose.model('Club').findById(club);
-        if (!clubExists) {
-          return res.status(400).json({
-            success: false,
-            message: 'Validation failed',
-            errors: [{ field: 'club', message: 'Invalid club ID. Club does not exist.' }]
-          });
-        }
-      } catch (error) {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          errors: [{ field: 'club', message: 'Invalid club ID format' }]
-        });
-      }
-    }
-
     // Update allowed fields
     if (name !== undefined) user.name = name;
     if (qid !== undefined) user.qid = qid;
     if (club !== undefined) user.club = club;
+    if (passport !== undefined) user.passport = passport;
     if (country !== undefined) user.country = country;
     if (dob !== undefined) user.dob = dob;
     if (gender !== undefined) user.gender = gender;
@@ -298,7 +235,6 @@ exports.updateUserById = async (req, res) => {
   } catch (error) {
     console.error('Update User Error:', error.message);
     
-    // Handle MongoDB duplicate key errors
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern)[0];
       return res.status(400).json({
@@ -308,7 +244,6 @@ exports.updateUserById = async (req, res) => {
       });
     }
 
-    // Handle Mongoose validation errors
     if (error.name === 'ValidationError') {
       const errors = Object.values(error.errors).map(err => ({
         field: err.path,
@@ -329,7 +264,6 @@ exports.updateUserById = async (req, res) => {
   }
 };
 
-// Delete user by ID (admin access)
 exports.deleteUserById = async (req, res) => {
   try {
     const user = await User.findByIdAndDelete(req.params.userId);

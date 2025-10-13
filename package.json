@@ -19,6 +19,8 @@
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.19.1",
-    "winston": "^3.18.3"
+    "multer": "^2.0.2",
+    "winston": "^3.18.3",
+    "xlsx": "^0.18.5"
   }
 }
