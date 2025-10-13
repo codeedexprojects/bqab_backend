@@ -1,5 +1,6 @@
 const User = require('./userModel');
 const mongoose = require('mongoose');
+const Tournament = require('../tournament/tournamentModel')
 
 // Create a new user
 exports.createUser = async (req, res) => {
@@ -13,6 +14,7 @@ exports.createUser = async (req, res) => {
       gender,
       mobile,
       level,
+      passport,
       role = 'customer',
       isActive = true
     } = req.body;
@@ -62,6 +64,7 @@ exports.createUser = async (req, res) => {
       qid,
       club,
       country,
+      passport,
       dob,
       gender,
       mobile,
@@ -143,6 +146,7 @@ exports.getAllUsers = async (req, res) => {
 
 exports.getUserById = async (req, res) => {
   try {
+    // Get basic user info with club details
     const user = await User.findById(req.params.userId)
       .select('-__v')
       .populate('club', 'name');
@@ -155,10 +159,97 @@ exports.getUserById = async (req, res) => {
       });
     }
 
+    // Get all tournaments where this user participated
+    const userTournaments = await Tournament.find({
+      $or: [
+        { 'players.user1': user._id },
+        { 'players.user2': user._id }
+      ]
+    })
+    .populate('categories', 'name type')
+    .select('name date location status players categories')
+    .sort({ date: -1 });
+
+    // Format the response as requested
+    const response = {
+      // User basic information
+      user: {
+        _id: user._id,
+        name: user.name,
+        qid: user.qid,
+        club: user.club,
+        country: user.country,
+        dob: user.dob,
+        gender: user.gender,
+        mobile: user.mobile,
+        level: user.level,
+        passport: user.passport,
+        role: user.role,
+        isActive: user.isActive,
+        totalPoints: user.points,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
+      },
+      
+      // Tournament participation (grouped by tournament)
+      tournamentParticipation: userTournaments.map(tournament => {
+        // Find all categories user participated in this tournament
+        const userEntries = tournament.players.filter(player => 
+          player.user1?.toString() === user._id.toString() || 
+          player.user2?.toString() === user._id.toString()
+        );
+
+        return {
+          tournament: {
+            _id: tournament._id,
+            name: tournament.name,
+            date: tournament.date,
+            location: tournament.location,
+            status: tournament.status
+          },
+          participations: userEntries.map(entry => {
+            const isPlayer1 = entry.user1?.toString() === user._id.toString();
+            
+            return {
+              category: {
+                id: entry.category,
+                name: entry.categoryName,
+                type: entry.categoryType
+              },
+              position: entry.position,
+              position2: entry.position2,
+              memberId: isPlayer1 ? entry.memberId : entry.memberIdTwo,
+              // Partner info for doubles
+              partner: entry.categoryType === 'doubles' ? {
+                userId: isPlayer1 ? entry.user2 : entry.user1,
+                name: isPlayer1 ? entry.player2 : entry.player1
+              } : null,
+              // Points from pointsHistory
+              pointsEarned: user.pointsHistory.find(ph => 
+                ph.tournament?.toString() === tournament._id.toString() &&
+                ph.category?.toString() === entry.category?.toString()
+              )?.pointsEarned || 0
+            };
+          })
+        };
+      }),
+
+      // Summary statistics
+      summary: {
+        totalTournaments: userTournaments.length,
+        totalCategories: user.categoryPoints.length,
+        totalPoints: user.points,
+        pointsByCategory: user.categoryPoints.map(cp => ({
+          categoryId: cp.category,
+          points: cp.points
+        }))
+      }
+    };
+
     res.status(200).json({
       success: true,
       message: 'User retrieved successfully',
-      data: user
+      data: response
     });
   } catch (error) {
     console.error('Get User By ID Error:', error.message);
