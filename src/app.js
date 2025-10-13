@@ -22,6 +22,7 @@ app.use(express.urlencoded({ extended: true }));
 const adminRoutes = require('./features/admin/auth/adminRoute')
 const adminClubRoutes = require('./features/admin/club/clubRoute')
 const adminUserRoutes = require('./features/admin/user/userRoute')
+const admintournamentRoutes = require('./features/admin/tournament/tournamentRoute')
 
 
 
@@ -32,6 +33,7 @@ const adminUserRoutes = require('./features/admin/user/userRoute')
 app.use('/admin/auth',adminRoutes)
 app.use('/admin/club',adminClubRoutes)
 app.use('/admin/user',adminUserRoutes)
+app.use('/admin/tournament',admintournamentRoutes)
 
 
 
