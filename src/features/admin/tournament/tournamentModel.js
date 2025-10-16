@@ -7,7 +7,11 @@ const tournamentSchema = new mongoose.Schema(
       required: [true, 'Tournament name is required'],
       trim: true
     },
-    date: {
+    start_date: {
+      type: Date,
+      default: Date.now
+    },
+    end_date: {
       type: Date,
       default: Date.now
     },
@@ -68,6 +72,15 @@ const tournamentSchema = new mongoose.Schema(
     isActive: {
       type: Boolean,
       default: true
+    },
+    originalFileName: {
+      type: String,
+      trim: true
+    },
+    fileHash: {
+      type: String,
+      unique: true,
+      sparse: true
     }
   },
   { timestamps: true }

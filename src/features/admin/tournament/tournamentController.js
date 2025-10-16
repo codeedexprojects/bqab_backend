@@ -3,6 +3,8 @@ const User = require('../user/userModel');
 const Category = require('../category/categoryModel');
 const XLSX = require('xlsx');
 const mongoose = require('mongoose');
+const crypto = require('crypto');
+const fs = require('fs');
 
 // Points mapping based on position
 const POINTS_MAPPING = {
@@ -23,6 +25,14 @@ const POINTS_MAPPING = {
   15: 15,
   16: 15
 };
+
+// Helper function to generate file hash
+function generateFileHash(filePath) {
+  const fileBuffer = fs.readFileSync(filePath);
+  const hashSum = crypto.createHash('sha256');
+  hashSum.update(fileBuffer);
+  return hashSum.digest('hex');
+}
 
 // Helper function to detect category type from name
 function detectCategoryType(categoryName) {
@@ -50,12 +60,11 @@ function detectCategoryType(categoryName) {
 
 // Helper function to generate random unique member ID
 function generateRandomMemberId() {
-  // Generate 11-digit random number (like 28635616918)
   const randomId = Math.floor(10000000000 + Math.random() * 90000000000).toString();
-  return `GEN${randomId}`; // Prefix with GEN to identify generated IDs
+  return `GEN${randomId}`;
 }
 
-// Enhanced create tournament with category support
+// Enhanced create tournament with file validation
 exports.createTournamentFromExcel = async (req, res) => {
   let session;
   
@@ -68,9 +77,18 @@ exports.createTournamentFromExcel = async (req, res) => {
       });
     }
 
-    const { name, location, date } = req.body;
+    const { name, location, start_date, end_date } = req.body;
 
     if (!name) {
+      // Clean up file immediately if validation fails
+      if (req.file && req.file.path) {
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch (unlinkError) {
+          console.error('Error deleting uploaded file:', unlinkError);
+        }
+      }
+      
       return res.status(400).json({
         success: false,
         message: 'Tournament name is required',
@@ -80,6 +98,14 @@ exports.createTournamentFromExcel = async (req, res) => {
 
     // Check MongoDB connection first
     if (mongoose.connection.readyState !== 1) {
+      if (req.file && req.file.path) {
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch (unlinkError) {
+          console.error('Error deleting uploaded file:', unlinkError);
+        }
+      }
+      
       return res.status(500).json({
         success: false,
         message: 'Database connection not ready',
@@ -87,7 +113,61 @@ exports.createTournamentFromExcel = async (req, res) => {
       });
     }
 
-    // Start session with longer timeout
+    // Step 1: Check for duplicate file name and content
+    const originalFileName = req.file.originalname;
+    const fileHash = generateFileHash(req.file.path);
+
+    // Check if file with same name already exists
+    const existingTournamentByName = await Tournament.findOne({ 
+      originalFileName: originalFileName 
+    });
+
+    if (existingTournamentByName) {
+      // Clean up uploaded file
+      if (req.file && req.file.path) {
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch (unlinkError) {
+          console.error('Error deleting uploaded file:', unlinkError);
+        }
+      }
+      
+      return res.status(409).json({
+        success: false,
+        message: 'File already exists',
+        errors: [{
+          field: 'file',
+          message: `A tournament with the file name "${originalFileName}" has already been uploaded. Please use a different file name.`
+        }]
+      });
+    }
+
+    // Check if file with same content already exists
+    const existingTournamentByHash = await Tournament.findOne({ 
+      fileHash: fileHash 
+    });
+
+    if (existingTournamentByHash) {
+      // Clean up uploaded file
+      if (req.file && req.file.path) {
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch (unlinkError) {
+          console.error('Error deleting uploaded file:', unlinkError);
+        }
+      }
+      
+      return res.status(409).json({
+        success: false,
+        message: 'Duplicate file content',
+        errors: [{
+          field: 'file',
+          message: 'This exact file has already been uploaded previously. Please upload a different file.'
+        }]
+      });
+    }
+
+    // Step 2: Proceed with tournament creation if no duplicates found
     session = await mongoose.startSession();
     const transactionOptions = {
       readPreference: 'primary',
@@ -104,6 +184,16 @@ exports.createTournamentFromExcel = async (req, res) => {
     
     if (sheetNames.length === 0) {
       await session.abortTransaction();
+      
+      // Clean up uploaded file
+      if (req.file && req.file.path) {
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch (unlinkError) {
+          console.error('Error deleting uploaded file:', unlinkError);
+        }
+      }
+      
       return res.status(400).json({
         success: false,
         message: 'Excel file has no sheets',
@@ -118,7 +208,7 @@ exports.createTournamentFromExcel = async (req, res) => {
     const createdUsers = [];
     const categoryStats = [];
     const createdCategories = [];
-    const generatedMemberIds = new Map(); // Track generated IDs to avoid duplicates in same session
+    const generatedMemberIds = new Map();
 
     for (const sheetName of sheetNames) {
       const worksheet = workbook.Sheets[sheetName];
@@ -213,6 +303,16 @@ exports.createTournamentFromExcel = async (req, res) => {
 
     if (allPlayers.length === 0) {
       await session.abortTransaction();
+      
+      // Clean up uploaded file
+      if (req.file && req.file.path) {
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch (unlinkError) {
+          console.error('Error deleting uploaded file:', unlinkError);
+        }
+      }
+      
       return res.status(400).json({
         success: false,
         message: 'No valid players found in any category',
@@ -221,14 +321,17 @@ exports.createTournamentFromExcel = async (req, res) => {
       });
     }
 
-    // Create tournament
+    // Create tournament with file tracking information
     const tournament = new Tournament({
       name,
       location: location || '',
-      date: date || new Date(),
+      start_date: start_date || new Date(),
+      end_date: end_date || new Date(),
       players: allPlayers,
       categories: createdCategories.map(cat => cat._id),
-      status: 'completed'
+      status: 'completed',
+      originalFileName: originalFileName,
+      fileHash: fileHash
     });
 
     await tournament.save({ session });
@@ -250,9 +353,11 @@ exports.createTournamentFromExcel = async (req, res) => {
           _id: tournament._id,
           name: tournament.name,
           location: tournament.location,
-          date: tournament.date,
+          start_date: tournament.start_date,
+          end_date: tournament.end_date,
           playersCount: allPlayers.length,
-          categoriesProcessed: categoryStats.filter(c => c.playersProcessed > 0).length
+          categoriesProcessed: categoryStats.filter(c => c.playersProcessed > 0).length,
+          originalFileName: tournament.originalFileName
         },
         categories: categoryStats,
         createdCategories: createdCategories.length > 0 ? createdCategories : undefined,
@@ -277,6 +382,9 @@ exports.createTournamentFromExcel = async (req, res) => {
       userMessage = 'Database connection issue. Please try again.';
     } else if (error.name === 'MongoTimeoutError') {
       userMessage = 'Operation timed out. Please try with a smaller file.';
+    } else if (error.code === 11000) {
+      // Duplicate key error (file hash collision)
+      userMessage = 'This file has already been uploaded. Please use a different file.';
     }
 
     res.status(500).json({
@@ -295,13 +403,74 @@ exports.createTournamentFromExcel = async (req, res) => {
     
     // Clean up uploaded file
     if (req.file && req.file.path) {
-      const fs = require('fs');
       try {
         fs.unlinkSync(req.file.path);
       } catch (unlinkError) {
         console.error('Error deleting uploaded file:', unlinkError);
       }
     }
+  }
+};
+
+// Add a new endpoint to check file uniqueness before upload
+exports.checkFileUniqueness = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file provided for validation'
+      });
+    }
+
+    const originalFileName = req.file.originalname;
+    const fileHash = generateFileHash(req.file.path);
+
+    // Check for existing files with same name or content
+    const existingByName = await Tournament.findOne({ originalFileName });
+    const existingByHash = await Tournament.findOne({ fileHash });
+
+    const result = {
+      success: true,
+      data: {
+        fileName: originalFileName,
+        isFileNameUnique: !existingByName,
+        isFileContentUnique: !existingByHash,
+        existingTournament: existingByName || existingByHash ? {
+          _id: (existingByName || existingByHash)._id,
+          name: (existingByName || existingByHash).name,
+          uploadDate: (existingByName || existingByHash).createdAt
+        } : null
+      }
+    };
+
+    // Clean up the temporary file
+    if (req.file && req.file.path) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (unlinkError) {
+        console.error('Error deleting validation file:', unlinkError);
+      }
+    }
+
+    res.status(200).json(result);
+
+  } catch (error) {
+    console.error('File Uniqueness Check Error:', error);
+    
+    // Clean up the temporary file
+    if (req.file && req.file.path) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (unlinkError) {
+        console.error('Error deleting validation file:', unlinkError);
+      }
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Error checking file uniqueness',
+      errors: [{ message: error.message }]
+    });
   }
 };
 
@@ -563,7 +732,8 @@ async function updateUserCategoryPoints(userKey, userData, tournament, session) 
         categoryType: userData.categoryType,
         pointsEarned: userData.points,
         position: Math.min(...userData.positions),
-        date: tournament.date
+        start_date: tournament.start_date,
+        end_date: tournament.end_date
       });
 
       await user.save({ session });
@@ -586,7 +756,8 @@ exports.getAllTournaments = async (req, res) => {
     const tournamentsWithSummary = tournaments.map(tournament => ({
       _id: tournament._id,
       name: tournament.name,
-      date: tournament.date,
+      start_date: tournament.start_date,
+      end_date: tournament.end_date,
       location: tournament.location,
       status: tournament.status,
       categoriesCount: tournament.categories.length,
@@ -642,6 +813,10 @@ exports.getTournamentById = async (req, res) => {
       });
     });
 
+    // Track unique player entries for accurate counting
+    const uniquePlayerEntries = new Set();
+    const uniqueUsersInTournament = new Set();
+
     // Group players by category
     tournament.players.forEach(player => {
       const categoryId = player.category.toString();
@@ -682,6 +857,17 @@ exports.getTournamentById = async (req, res) => {
         };
 
         categoryData.players.push(playerEntry);
+        
+        // Count this as one player entry (team in doubles, individual in singles)
+        uniquePlayerEntries.add(player._id.toString());
+        
+        // Track unique users across the tournament
+        if (player.user1) {
+          uniqueUsersInTournament.add(player.user1._id.toString());
+        }
+        if (player.user2) {
+          uniqueUsersInTournament.add(player.user2._id.toString());
+        }
       }
     });
 
@@ -691,16 +877,33 @@ exports.getTournamentById = async (req, res) => {
       players: category.players.sort((a, b) => a.position - b.position)
     }));
 
+    // Calculate accurate statistics
+    const singlesCategories = categories.filter(cat => cat.type === 'singles');
+    const doublesCategories = categories.filter(cat => cat.type === 'doubles');
+    
+    const singlesEntries = singlesCategories.reduce((total, cat) => total + cat.players.length, 0);
+    const doublesEntries = doublesCategories.reduce((total, cat) => total + cat.players.length, 0);
+    const totalTeams = singlesEntries + doublesEntries;
+    const totalIndividualPlayers = singlesEntries + (doublesEntries * 2); // Each doubles entry has 2 players
+
     // Structure the final response
     const structuredTournament = {
       _id: tournament._id,
       name: tournament.name,
-      date: tournament.date,
+      start_date: tournament.start_date,
+      end_date: tournament.end_date,
       location: tournament.location,
       status: tournament.status,
       categories: categories,
-      totalPlayers: tournament.players.length,
-      totalCategories: categories.length
+      statistics: {
+        totalCategories: categories.length,
+        singlesCategories: singlesCategories.length,
+        doublesCategories: doublesCategories.length,
+        totalPlayerEntries: uniquePlayerEntries.size, 
+        totalTeams: totalTeams,
+        totalIndividualPlayers: totalIndividualPlayers, 
+        uniqueUsers: uniqueUsersInTournament.size 
+      }
     };
 
     res.status(200).json({
