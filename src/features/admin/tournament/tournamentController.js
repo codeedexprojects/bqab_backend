@@ -678,7 +678,9 @@ exports.getTournamentById = async (req, res) => {
       .select('-__v')
       .populate('categories', 'name type')
       .populate('players.user1', 'name qid points categoryPoints')
-      .populate('players.user2', 'name qid points categoryPoints');
+      .populate('players.user2', 'name qid points categoryPoints')
+      .populate('umpires.umpire', 'name country level specialization passport gender mobileNumber email')
+      .populate('umpires.categories', 'name type');
 
     if (!tournament) {
       return res.status(404).json({
@@ -765,6 +767,31 @@ exports.getTournamentById = async (req, res) => {
       players: category.players.sort((a, b) => a.position - b.position)
     }));
 
+    // Process umpires data
+    const umpires = tournament.umpires.map(umpireAssignment => ({
+      _id: umpireAssignment.umpire._id,
+      umpireId: umpireAssignment.umpire.umpireId,
+      name: umpireAssignment.umpire.name,
+      country: umpireAssignment.umpire.country,
+      level: umpireAssignment.umpire.level,
+      specialization: umpireAssignment.umpire.specialization,
+      passport: umpireAssignment.umpire.passport,
+      gender: umpireAssignment.umpire.gender,
+      mobileNumber: umpireAssignment.umpire.mobileNumber,
+      email: umpireAssignment.umpire.email,
+      role: umpireAssignment.role,
+      assignedCategories: umpireAssignment.categories,
+      assignedDate: umpireAssignment.assignedDate
+    }));
+
+    // Group umpires by role for better organization
+    const umpiresByRole = {
+      chief_umpire: umpires.filter(u => u.role === 'chief_umpire'),
+      chair_umpire: umpires.filter(u => u.role === 'chair_umpire'),
+      line_umpire: umpires.filter(u => u.role === 'line_umpire'),
+      reserve_umpire: umpires.filter(u => u.role === 'reserve_umpire')
+    };
+
     // Calculate accurate statistics
     const singlesCategories = categories.filter(cat => cat.type === 'singles');
     const doublesCategories = categories.filter(cat => cat.type === 'doubles');
@@ -782,7 +809,20 @@ exports.getTournamentById = async (req, res) => {
       end_date: tournament.end_date,
       location: tournament.location,
       status: tournament.status,
+      isActive: tournament.isActive,
+      originalFileName: tournament.originalFileName,
       categories: categories,
+      umpires: {
+        all: umpires,
+        byRole: umpiresByRole,
+        statistics: {
+          totalUmpires: umpires.length,
+          chiefUmpires: umpiresByRole.chief_umpire.length,
+          chairUmpires: umpiresByRole.chair_umpire.length,
+          lineUmpires: umpiresByRole.line_umpire.length,
+          reserveUmpires: umpiresByRole.reserve_umpire.length
+        }
+      },
       statistics: {
         totalCategories: categories.length,
         singlesCategories: singlesCategories.length,
@@ -790,7 +830,12 @@ exports.getTournamentById = async (req, res) => {
         totalPlayerEntries: uniquePlayerEntries.size, 
         totalTeams: totalTeams,
         totalIndividualPlayers: totalIndividualPlayers, 
-        uniqueUsers: uniqueUsersInTournament.size 
+        uniqueUsers: uniqueUsersInTournament.size,
+        umpiresCount: umpires.length
+      },
+      timestamps: {
+        createdAt: tournament.createdAt,
+        updatedAt: tournament.updatedAt
       }
     };
 
