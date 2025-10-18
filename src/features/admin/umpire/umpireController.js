@@ -13,7 +13,6 @@ exports.getAllUmpires = async (req, res) => {
       level,
       gender,
       isActive,
-      specialization 
     } = req.query;
 
     const skip = (page - 1) * limit;
@@ -32,10 +31,7 @@ exports.getAllUmpires = async (req, res) => {
       query.country = { $regex: country, $options: 'i' };
     }
 
-    // Filter by level
-    if (level) {
-      query.level = level;
-    }
+
 
     // Filter by gender
     if (gender) {
@@ -47,10 +43,7 @@ exports.getAllUmpires = async (req, res) => {
       query.isActive = isActive === 'true';
     }
 
-    // Filter by specialization
-    if (specialization) {
-      query.specialization = { $in: [specialization] };
-    }
+ 
 
     const [umpires, totalCount] = await Promise.all([
       Umpire.find(query)
@@ -71,13 +64,8 @@ exports.getAllUmpires = async (req, res) => {
       country: umpire.country,
       passport: umpire.passport,
       gender: umpire.gender,
-      dateOfBirth: umpire.dateOfBirth,
       mobileNumber: umpire.mobileNumber,
-      email: umpire.email,
-      level: umpire.level,
-      certification: umpire.certification,
       experience: umpire.experience,
-      specialization: umpire.specialization,
       isActive: umpire.isActive,
       assignedTournamentsCount: umpire.assignedTournaments.length,
       assignedTournaments: umpire.assignedTournaments.map(at => ({
@@ -153,13 +141,8 @@ exports.createUmpire = async (req, res) => {
       country,
       passport,
       gender,
-      dateOfBirth,
       mobileNumber,
-      email,
-      level,
-      certification,
       experience,
-      specialization
     } = req.body;
 
     // Check for duplicate passport if provided
@@ -174,30 +157,15 @@ exports.createUmpire = async (req, res) => {
       }
     }
 
-    // Check for duplicate email if provided
-    if (email) {
-      const existingUmpire = await Umpire.findOne({ email });
-      if (existingUmpire) {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          errors: [{ field: 'email', message: 'Email already exists' }]
-        });
-      }
-    }
+ 
 
     const newUmpire = new Umpire({
       name,
       country,
       passport,
       gender,
-      dateOfBirth,
       mobileNumber: mobileNumber || [],
-      email,
-      level: level || 'regional',
-      certification,
       experience: experience || 0,
-      specialization: specialization || ['singles', 'doubles']
     });
 
     await newUmpire.save();
@@ -253,13 +221,8 @@ exports.updateUmpire = async (req, res) => {
       country,
       passport,
       gender,
-      dateOfBirth,
-      mobileNumber,
-      email,
-      level,
-      certification,
+      mobileNumber,   
       experience,
-      specialization,
       isActive
     } = req.body;
 
@@ -285,22 +248,12 @@ exports.updateUmpire = async (req, res) => {
       }
     }
 
-    // Check for duplicate email
-    if (email && email !== umpire.email) {
-      const existingUmpire = await Umpire.findOne({ email, _id: { $ne: umpire._id } });
-      if (existingUmpire) {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          errors: [{ field: 'email', message: 'Email already exists' }]
-        });
-      }
-    }
+   
 
     // Update fields
     const updateFields = {
-      name, country, passport, gender, dateOfBirth, mobileNumber, email,
-      level, certification, experience, specialization, isActive
+      name, country, passport, gender, mobileNumber, 
+       experience, isActive
     };
 
     Object.keys(updateFields).forEach(key => {
@@ -510,7 +463,7 @@ exports.getUmpiresByTournament = async (req, res) => {
     const umpires = await Umpire.find({
       'assignedTournaments.tournament': tournamentId
     })
-    .select('name country level specialization assignedTournaments')
+    .select('name country  assignedTournaments')
     .populate('assignedTournaments.tournament', 'name start_date end_date location')
     .populate('assignedTournaments.categories', 'name type');
 
@@ -525,8 +478,6 @@ exports.getUmpiresByTournament = async (req, res) => {
         umpireId: umpire.umpireId,
         name: umpire.name,
         country: umpire.country,
-        level: umpire.level,
-        specialization: umpire.specialization,
         assignment: tournamentAssignment
       };
     });
