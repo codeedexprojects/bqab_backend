@@ -39,7 +39,7 @@ app.use('/admin/user',adminUserRoutes)
 app.use('/admin/tournament',admintournamentRoutes)
 app.use('/admin/category',adminCategoryRoutes)
 app.use('/admin/ranking',adminRankingRoutes)
-app.use('/admin/upmire',adminUmpireRoutes)
+app.use('/admin/umpire',adminUmpireRoutes)
 
 
 
