@@ -526,28 +526,35 @@ async function bulkUpdateUserPoints(userPointsMap, tournament, session) {
   const bulkOps = [];
   
   for (const [userKey, userData] of userPointsMap) {
+    // Update total points and category points
     bulkOps.push({
       updateOne: {
         filter: { _id: userData.userId },
         update: {
-          $inc: { points: userData.points },
+          $inc: { 
+            totalPoints: userData.points,
+            'categoryPoints.$[elem].points': userData.points,
+            'categoryPoints.$[elem].tournamentsCount': 1
+          },
+          $set: {
+            'categoryPoints.$[elem].lastUpdated': new Date()
+          },
           $push: {
             pointsHistory: {
               tournament: tournament._id,
+              tournamentName: tournament.name,
               category: userData.categoryId,
               categoryName: userData.categoryName,
               categoryType: userData.categoryType,
               pointsEarned: userData.points,
               position: Math.min(...userData.positions),
-              start_date: tournament.start_date,
-              end_date: tournament.end_date
+              date: new Date()
             }
-          },
-          $set: {
-            [`categoryPoints.$[elem].points`]: userData.points
           }
         },
-        arrayFilters: [{ 'elem.category': userData.categoryId }],
+        arrayFilters: [{ 
+          'elem.category': userData.categoryId 
+        }],
         upsert: false
       }
     });
@@ -563,7 +570,11 @@ async function bulkUpdateUserPoints(userPointsMap, tournament, session) {
           $push: {
             categoryPoints: {
               category: userData.categoryId,
-              points: userData.points
+              categoryName: userData.categoryName,
+              categoryType: userData.categoryType,
+              points: userData.points,
+              tournamentsCount: 1,
+              lastUpdated: new Date()
             }
           }
         }
@@ -809,6 +820,106 @@ exports.getTournamentById = async (req, res) => {
   }
 };
 
+// Add this to your tournamentController.js
+exports.getTournamentWithRankings = async (req, res) => {
+  try {
+    const tournament = await Tournament.findById(req.params.tournamentId)
+      .populate('categories', 'name type')
+      .populate('players.user1', 'name qid categoryPoints')
+      .populate('players.user2', 'name qid categoryPoints');
+
+    if (!tournament) {
+      return res.status(404).json({
+        success: false,
+        message: 'Tournament not found',
+        errors: [{ message: 'No tournament found with this ID' }]
+      });
+    }
+
+    // Group by category and calculate rankings
+    const categoriesWithRankings = [];
+    const categoryMap = new Map();
+
+    tournament.players.forEach(player => {
+      const categoryId = player.category.toString();
+      if (!categoryMap.has(categoryId)) {
+        const category = tournament.categories.find(c => c._id.toString() === categoryId);
+        categoryMap.set(categoryId, {
+          category: category,
+          players: []
+        });
+      }
+
+      const categoryData = categoryMap.get(categoryId);
+      const points = POINTS_MAPPING[player.position] || 0;
+
+      if (player.categoryType === 'singles' && player.user1) {
+        categoryData.players.push({
+          user: player.user1,
+          memberId: player.memberId,
+          position: player.position,
+          points: points
+        });
+      } else if (player.categoryType === 'doubles') {
+        // Handle doubles - both players get the same points
+        if (player.user1) {
+          categoryData.players.push({
+            user: player.user1,
+            memberId: player.memberId,
+            position: player.position,
+            points: points,
+            partner: player.user2
+          });
+        }
+        if (player.user2) {
+          categoryData.players.push({
+            user: player.user2,
+            memberId: player.memberIdTwo,
+            position: player.position2,
+            points: points,
+            partner: player.user1
+          });
+        }
+      }
+    });
+
+    // Sort and rank players in each category
+    categoryMap.forEach((categoryData) => {
+      categoryData.players.sort((a, b) => b.points - a.points);
+      
+      const playersWithRank = categoryData.players.map((player, index) => ({
+        rank: index + 1,
+        ...player
+      }));
+
+      categoriesWithRankings.push({
+        category: categoryData.category,
+        players: playersWithRank
+      });
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Tournament with rankings retrieved successfully',
+      data: {
+        tournament: {
+          _id: tournament._id,
+          name: tournament.name,
+          date: tournament.date,
+          location: tournament.location
+        },
+        categories: categoriesWithRankings
+      }
+    });
+  } catch (error) {
+    console.error('Get Tournament With Rankings Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      errors: [{ message: error.message }]
+    });
+  }
+};
 exports.deleteTournament = async (req, res) => {
   let session;
   
@@ -912,7 +1023,3 @@ async function revertUserCategoryPoints(userId, tournamentId, categoryIds, sessi
     throw error;
   }
 }
-
-
-
-
