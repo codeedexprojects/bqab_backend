@@ -776,3 +776,7 @@
 {"level":"info","message":"🚀 Server running at http://0.0.0.0:3006","timestamp":"2025-10-18T10:28:19.035Z"}
 {"level":"info","message":"MongoDB connected successfully","timestamp":"2025-10-18T10:54:46.458Z"}
 {"level":"info","message":"🚀 Server running at http://0.0.0.0:3006","timestamp":"2025-10-18T10:54:46.465Z"}
+{"level":"info","message":"MongoDB connected successfully","timestamp":"2025-10-22T09:10:43.241Z"}
+{"level":"info","message":"🚀 Server running at http://0.0.0.0:3006","timestamp":"2025-10-22T09:10:43.246Z"}
+{"level":"info","message":"MongoDB connected successfully","timestamp":"2025-10-22T09:11:03.924Z"}
+{"level":"info","message":"🚀 Server running at http://0.0.0.0:3006","timestamp":"2025-10-22T09:11:03.936Z"}

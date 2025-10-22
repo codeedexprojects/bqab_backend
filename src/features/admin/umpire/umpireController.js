@@ -346,14 +346,21 @@ exports.deleteUmpire = async (req, res) => {
 };
 
 // Assign umpire to tournament
+// Assign umpire to tournament - UPDATED VERSION
 exports.assignToTournament = async (req, res) => {
+  let session;
+  
   try {
+    session = await mongoose.startSession();
+    await session.startTransaction();
+
     const { umpireId } = req.params;
     const { tournamentId, role, categories } = req.body;
 
     // Validate tournament exists
-    const tournament = await Tournament.findById(tournamentId);
+    const tournament = await Tournament.findById(tournamentId).session(session);
     if (!tournament) {
+      await session.abortTransaction();
       return res.status(404).json({
         success: false,
         message: 'Tournament not found',
@@ -361,8 +368,9 @@ exports.assignToTournament = async (req, res) => {
       });
     }
 
-    const umpire = await Umpire.findById(umpireId);
+    const umpire = await Umpire.findById(umpireId).session(session);
     if (!umpire) {
+      await session.abortTransaction();
       return res.status(404).json({
         success: false,
         message: 'Umpire not found',
@@ -370,12 +378,18 @@ exports.assignToTournament = async (req, res) => {
       });
     }
 
-    // Check if already assigned to this tournament
-    const existingAssignment = umpire.assignedTournaments.find(
+    // Check if already assigned to this tournament in UMPIRE document
+    const existingUmpireAssignment = umpire.assignedTournaments.find(
       assignment => assignment.tournament.toString() === tournamentId
     );
 
-    if (existingAssignment) {
+    // Check if already assigned to this tournament in TOURNAMENT document
+    const existingTournamentAssignment = tournament.umpires.find(
+      assignment => assignment.umpire.toString() === umpireId
+    );
+
+    if (existingUmpireAssignment || existingTournamentAssignment) {
+      await session.abortTransaction();
       return res.status(400).json({
         success: false,
         message: 'Assignment failed',
@@ -383,15 +397,47 @@ exports.assignToTournament = async (req, res) => {
       });
     }
 
-    // Add assignment
-    umpire.assignedTournaments.push({
-      tournament: tournamentId,
+    // Create assignment object
+    const assignmentData = {
+      umpire: umpireId,
       role: role || 'chair_umpire',
-      categories: categories || []
-    });
+      categories: categories || [],
+      assignedDate: new Date()
+    };
 
-    await umpire.save();
+    // Update BOTH documents in transaction
+    await Promise.all([
+      // Add to umpire's assignedTournaments
+      Umpire.findByIdAndUpdate(
+        umpireId,
+        {
+          $push: {
+            assignedTournaments: {
+              tournament: tournamentId,
+              role: role || 'chair_umpire',
+              categories: categories || [],
+              assignedDate: new Date()
+            }
+          }
+        },
+        { session }
+      ),
+      
+      // Add to tournament's umpires array
+      Tournament.findByIdAndUpdate(
+        tournamentId,
+        {
+          $push: {
+            umpires: assignmentData
+          }
+        },
+        { session }
+      )
+    ]);
 
+    await session.commitTransaction();
+
+    // Fetch updated umpire with populated data
     const updatedUmpire = await Umpire.findById(umpireId)
       .select('-__v')
       .populate('assignedTournaments.tournament', 'name start_date end_date location')
@@ -404,22 +450,40 @@ exports.assignToTournament = async (req, res) => {
     });
 
   } catch (error) {
+    if (session) {
+      await session.abortTransaction();
+    }
     console.error('Assign Umpire Error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error',
       errors: [{ message: error.message }]
     });
+  } finally {
+    if (session) {
+      session.endSession();
+    }
   }
 };
 
 // Remove umpire from tournament
+// Remove umpire from tournament - UPDATED VERSION
 exports.removeFromTournament = async (req, res) => {
+  let session;
+  
   try {
+    session = await mongoose.startSession();
+    await session.startTransaction();
+
     const { umpireId, tournamentId } = req.params;
 
-    const umpire = await Umpire.findById(umpireId);
+    const [umpire, tournament] = await Promise.all([
+      Umpire.findById(umpireId).session(session),
+      Tournament.findById(tournamentId).session(session)
+    ]);
+
     if (!umpire) {
+      await session.abortTransaction();
       return res.status(404).json({
         success: false,
         message: 'Umpire not found',
@@ -427,12 +491,41 @@ exports.removeFromTournament = async (req, res) => {
       });
     }
 
-    // Remove assignment
-    umpire.assignedTournaments = umpire.assignedTournaments.filter(
-      assignment => assignment.tournament.toString() !== tournamentId
-    );
+    if (!tournament) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'Tournament not found',
+        errors: [{ message: 'No tournament found with this ID' }]
+      });
+    }
 
-    await umpire.save();
+    // Remove assignment from BOTH documents
+    await Promise.all([
+      // Remove from umpire's assignedTournaments
+      Umpire.findByIdAndUpdate(
+        umpireId,
+        {
+          $pull: {
+            assignedTournaments: { tournament: tournamentId }
+          }
+        },
+        { session }
+      ),
+      
+      // Remove from tournament's umpires array
+      Tournament.findByIdAndUpdate(
+        tournamentId,
+        {
+          $pull: {
+            umpires: { umpire: umpireId }
+          }
+        },
+        { session }
+      )
+    ]);
+
+    await session.commitTransaction();
 
     const updatedUmpire = await Umpire.findById(umpireId)
       .select('-__v')
@@ -446,12 +539,19 @@ exports.removeFromTournament = async (req, res) => {
     });
 
   } catch (error) {
+    if (session) {
+      await session.abortTransaction();
+    }
     console.error('Remove Umpire Error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error',
       errors: [{ message: error.message }]
     });
+  } finally {
+    if (session) {
+      session.endSession();
+    }
   }
 };
 
