@@ -23,6 +23,9 @@ const adminRoutes = require('./features/admin/auth/adminRoute')
 const adminClubRoutes = require('./features/admin/club/clubRoute')
 const adminUserRoutes = require('./features/admin/user/userRoute')
 const admintournamentRoutes = require('./features/admin/tournament/tournamentRoute')
+const adminCategoryRoutes = require('./features/admin/category/categoryRoute')
+const adminRankingRoutes = require('./features/admin/ranking/rankingRoutes')
+const adminUmpireRoutes = require('./features/admin/umpire/umpireRoute')
 
 
 
@@ -34,6 +37,10 @@ app.use('/admin/auth',adminRoutes)
 app.use('/admin/club',adminClubRoutes)
 app.use('/admin/user',adminUserRoutes)
 app.use('/admin/tournament',admintournamentRoutes)
+app.use('/admin/category',adminCategoryRoutes)
+app.use('/admin/ranking',adminRankingRoutes)
+app.use('/admin/umpire',adminUmpireRoutes)
+
 
 
 
