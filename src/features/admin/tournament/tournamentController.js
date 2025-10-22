@@ -690,7 +690,7 @@ exports.getTournamentById = async (req, res) => {
       .populate('categories', 'name type')
       .populate('players.user1', 'name qid points categoryPoints')
       .populate('players.user2', 'name qid points categoryPoints')
-      .populate('umpires.umpire', 'name country level specialization passport gender mobileNumber email')
+      .populate('umpires.umpire', 'name country gender mobileNumber experience umpireId')
       .populate('umpires.categories', 'name type');
 
     if (!tournament) {
@@ -778,30 +778,30 @@ exports.getTournamentById = async (req, res) => {
       players: category.players.sort((a, b) => a.position - b.position)
     }));
 
-    // Process umpires data
+    // Process umpires data - simplified without role validation
     const umpires = tournament.umpires.map(umpireAssignment => ({
       _id: umpireAssignment.umpire._id,
       umpireId: umpireAssignment.umpire.umpireId,
       name: umpireAssignment.umpire.name,
       country: umpireAssignment.umpire.country,
-      level: umpireAssignment.umpire.level,
-      specialization: umpireAssignment.umpire.specialization,
       passport: umpireAssignment.umpire.passport,
       gender: umpireAssignment.umpire.gender,
       mobileNumber: umpireAssignment.umpire.mobileNumber,
-      email: umpireAssignment.umpire.email,
+      experience: umpireAssignment.umpire.experience,
       role: umpireAssignment.role,
       assignedCategories: umpireAssignment.categories,
       assignedDate: umpireAssignment.assignedDate
     }));
 
-    // Group umpires by role for better organization
-    const umpiresByRole = {
-      chief_umpire: umpires.filter(u => u.role === 'chief_umpire'),
-      chair_umpire: umpires.filter(u => u.role === 'chair_umpire'),
-      line_umpire: umpires.filter(u => u.role === 'line_umpire'),
-      reserve_umpire: umpires.filter(u => u.role === 'reserve_umpire')
-    };
+    // Group umpires by role dynamically (no preset roles)
+    const umpiresByRole = {};
+    umpires.forEach(umpire => {
+      const role = umpire.role || 'chair_umpire';
+      if (!umpiresByRole[role]) {
+        umpiresByRole[role] = [];
+      }
+      umpiresByRole[role].push(umpire);
+    });
 
     // Calculate accurate statistics
     const singlesCategories = categories.filter(cat => cat.type === 'singles');
@@ -810,7 +810,7 @@ exports.getTournamentById = async (req, res) => {
     const singlesEntries = singlesCategories.reduce((total, cat) => total + cat.players.length, 0);
     const doublesEntries = doublesCategories.reduce((total, cat) => total + cat.players.length, 0);
     const totalTeams = singlesEntries + doublesEntries;
-    const totalIndividualPlayers = singlesEntries + (doublesEntries * 2); // Each doubles entry has 2 players
+    const totalIndividualPlayers = singlesEntries + (doublesEntries * 2);
 
     // Structure the final response
     const structuredTournament = {
@@ -828,10 +828,10 @@ exports.getTournamentById = async (req, res) => {
         byRole: umpiresByRole,
         statistics: {
           totalUmpires: umpires.length,
-          chiefUmpires: umpiresByRole.chief_umpire.length,
-          chairUmpires: umpiresByRole.chair_umpire.length,
-          lineUmpires: umpiresByRole.line_umpire.length,
-          reserveUmpires: umpiresByRole.reserve_umpire.length
+          roles: Object.keys(umpiresByRole).map(role => ({
+            role: role,
+            count: umpiresByRole[role].length
+          }))
         }
       },
       statistics: {
