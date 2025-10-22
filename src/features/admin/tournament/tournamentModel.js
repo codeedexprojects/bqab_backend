@@ -64,8 +64,6 @@ const tournamentSchema = new mongoose.Schema(
       },
       role: {
         type: String,
-        enum: ['chair_umpire', 'chief_umpire', 'line_umpire', 'reserve_umpire'],
-        default: 'chair_umpire'
       },
       categories: [{
         type: mongoose.Schema.Types.ObjectId,

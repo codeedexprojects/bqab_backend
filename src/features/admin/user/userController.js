@@ -170,7 +170,93 @@ exports.getUserById = async (req, res) => {
     .select('name date location status players categories')
     .sort({ date: -1 });
 
-    // Format the response as requested
+    // Group data by category first, then tournaments within each category
+    const categoryMap = new Map();
+
+    userTournaments.forEach(tournament => {
+      // Find all categories user participated in this tournament
+      const userEntries = tournament.players.filter(player => 
+        player.user1?.toString() === user._id.toString() || 
+        player.user2?.toString() === user._id.toString()
+      );
+
+      userEntries.forEach(entry => {
+        const categoryId = entry.category?.toString();
+        
+        if (!categoryId) return;
+
+        // Get or create category entry
+        if (!categoryMap.has(categoryId)) {
+          // Find category details from tournament categories or use entry data
+          const categoryDetails = tournament.categories.find(cat => 
+            cat._id.toString() === categoryId
+          ) || {
+            _id: entry.category,
+            name: entry.categoryName || 'Unknown Category',
+            type: entry.categoryType || 'singles'
+          };
+
+          categoryMap.set(categoryId, {
+            category: {
+              _id: categoryDetails._id,
+              name: categoryDetails.name,
+              type: categoryDetails.type
+            },
+            totalPoints: 0,
+            tournaments: []
+          });
+        }
+
+        const categoryData = categoryMap.get(categoryId);
+        
+        // Calculate points for this tournament entry
+        const pointsEarned = user.pointsHistory.find(ph => 
+          ph.tournament?.toString() === tournament._id.toString() &&
+          ph.category?.toString() === categoryId
+        )?.pointsEarned || 0;
+
+        // Add points to category total
+        categoryData.totalPoints += pointsEarned;
+
+        // Create tournament entry
+        const tournamentEntry = {
+          tournament: {
+            _id: tournament._id,
+            name: tournament.name,
+            date: tournament.date,
+            location: tournament.location,
+            status: tournament.status
+          },
+          participation: {
+            position: entry.position,
+            position2: entry.position2,
+            memberId: entry.user1?.toString() === user._id.toString() ? entry.memberId : entry.memberIdTwo,
+            pointsEarned: pointsEarned,
+            // Partner info for doubles
+            partner: entry.categoryType === 'doubles' ? {
+              userId: entry.user1?.toString() === user._id.toString() ? entry.user2 : entry.user1,
+              name: entry.user1?.toString() === user._id.toString() ? entry.player2 : entry.player1
+            } : null
+          }
+        };
+
+        categoryData.tournaments.push(tournamentEntry);
+      });
+    });
+
+    // Convert map to array and sort tournaments by date within each category
+    const categoriesWithTournaments = Array.from(categoryMap.values()).map(categoryData => ({
+      ...categoryData,
+      tournaments: categoryData.tournaments.sort((a, b) => new Date(b.tournament.date) - new Date(a.tournament.date))
+    }));
+
+    // Calculate summary statistics
+    const totalTournaments = new Set();
+    userTournaments.forEach(tournament => {
+      totalTournaments.add(tournament._id.toString());
+    });
+
+    // Format the response as requested - Category first, then tournaments
     const response = {
       // User basic information
       user: {
@@ -191,53 +277,13 @@ exports.getUserById = async (req, res) => {
         updatedAt: user.updatedAt
       },
       
-      // Tournament participation (grouped by tournament)
-      tournamentParticipation: userTournaments.map(tournament => {
-        // Find all categories user participated in this tournament
-        const userEntries = tournament.players.filter(player => 
-          player.user1?.toString() === user._id.toString() || 
-          player.user2?.toString() === user._id.toString()
-        );
-
-        return {
-          tournament: {
-            _id: tournament._id,
-            name: tournament.name,
-            date: tournament.date,
-            location: tournament.location,
-            status: tournament.status
-          },
-          participations: userEntries.map(entry => {
-            const isPlayer1 = entry.user1?.toString() === user._id.toString();
-            
-            return {
-              category: {
-                id: entry.category,
-                name: entry.categoryName,
-                type: entry.categoryType
-              },
-              position: entry.position,
-              position2: entry.position2,
-              memberId: isPlayer1 ? entry.memberId : entry.memberIdTwo,
-              // Partner info for doubles
-              partner: entry.categoryType === 'doubles' ? {
-                userId: isPlayer1 ? entry.user2 : entry.user1,
-                name: isPlayer1 ? entry.player2 : entry.player1
-              } : null,
-              // Points from pointsHistory
-              pointsEarned: user.pointsHistory.find(ph => 
-                ph.tournament?.toString() === tournament._id.toString() &&
-                ph.category?.toString() === entry.category?.toString()
-              )?.pointsEarned || 0
-            };
-          })
-        };
-      }),
-
+      // Category-wise participation (grouped by category)
+      categoryParticipation: categoriesWithTournaments,
+      
       // Summary statistics
       summary: {
-        totalTournaments: userTournaments.length,
-        totalCategories: user.categoryPoints.length,
+        totalTournaments: totalTournaments.size,
+        totalCategories: categoriesWithTournaments.length,
         totalPoints: user.points,
         pointsByCategory: user.categoryPoints.map(cp => ({
           categoryId: cp.category,
