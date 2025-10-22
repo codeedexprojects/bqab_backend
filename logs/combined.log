@@ -798,3 +798,5 @@
 {"level":"info","message":"🚀 Server running at http://0.0.0.0:3006","timestamp":"2025-10-22T10:52:10.770Z"}
 {"level":"info","message":"MongoDB connected successfully","timestamp":"2025-10-22T10:52:20.630Z"}
 {"level":"info","message":"🚀 Server running at http://0.0.0.0:3006","timestamp":"2025-10-22T10:52:20.636Z"}
+{"level":"info","message":"MongoDB connected successfully","timestamp":"2025-10-22T10:52:40.828Z"}
+{"level":"info","message":"🚀 Server running at http://0.0.0.0:3006","timestamp":"2025-10-22T10:52:40.841Z"}
