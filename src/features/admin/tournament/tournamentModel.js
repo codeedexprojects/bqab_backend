@@ -57,7 +57,7 @@ const tournamentSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Category'
     }],
-    umpires: [{
+       umpires: [{
       umpire: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Umpire'
@@ -74,6 +74,7 @@ const tournamentSchema = new mongoose.Schema(
         default: Date.now
       }
     }],
+
     status: {
       type: String,
       enum: ['pending', 'completed', 'cancelled'],
