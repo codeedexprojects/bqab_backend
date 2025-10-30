@@ -28,50 +28,25 @@ const umpireSchema = new mongoose.Schema(
       enum: ['male', 'female', 'other'],
       required: [true, 'Gender is required']
     },
-    dateOfBirth: {
-      type: Date,
-      required: [true, 'Date of birth is required']
-    },
     mobileNumber: {
-      type: [String],
+      type: String,
+      unique: true,
+      sparse: true,
       validate: {
-        validator: function(v) {
-          // Allow empty array or validate each number
-          if (v.length === 0) return true;
-          for (let num of v) {
-            if (!/^[0-9]{10}$/.test(num)) return false;
-          }
-          return v.length <= 3; // Maximum 3 numbers
+        validator: function (v) {
+          if (!v) return true;
+          const phoneRegex = /^[0-9]{10,15}$/; 
+          return phoneRegex.test(v);
         },
-        message: 'Mobile numbers must be max 3 numbers and each must be 10 digits'
+        message: (props) => `${props.value} is not a valid phone number!`,
       },
-      default: []
-    },
-    email: {
-      type: String,
-      trim: true,
-      lowercase: true,
-      match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
-    },
-    level: {
-      type: String,
-      enum: ['international', 'national', 'state', 'regional'],
-      default: 'regional'
-    },
-    certification: {
-      type: String,
-      trim: true
     },
     experience: {
-      type: Number, // years of experience
+      type: Number, 
       min: 0,
       default: 0
     },
-    specialization: {
-      type: [String],
-      enum: ['singles', 'doubles', 'chair_umpire', 'line_umpire', 'chief_umpire'],
-      default: ['singles', 'doubles']
-    },
+
     isActive: {
       type: Boolean,
       default: true,
@@ -87,7 +62,6 @@ const umpireSchema = new mongoose.Schema(
       },
       role: {
         type: String,
-        enum: ['chair_umpire', 'chief_umpire', 'line_umpire', 'reserve_umpire'],
         default: 'chair_umpire'
       },
       categories: [{
