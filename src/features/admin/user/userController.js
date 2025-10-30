@@ -2,6 +2,32 @@ const User = require('./userModel');
 const mongoose = require('mongoose');
 const Tournament = require('../tournament/tournamentModel')
 
+
+// Position display mapping
+const POSITION_DISPLAY_MAPPING = {
+  1: 'Winner',
+  2: 'Runner-Up',
+  3: 'Semifinal',
+  4: 'Semifinal',
+  5: 'Quarter Final',
+  6: 'Quarter Final',
+  7: 'Quarter Final',
+  8: 'Quarter Final',
+  9: 'Pre-Quarter',
+  10: 'Pre-Quarter',
+  11: 'Pre-Quarter',
+  12: 'Pre-Quarter',
+  13: 'Pre-Quarter',
+  14: 'Pre-Quarter',
+  15: 'Pre-Quarter',
+  16: 'Pre-Quarter'
+};
+
+// Helper function to get display position
+const getDisplayPosition = (position) => {
+  return POSITION_DISPLAY_MAPPING[position] || (position ? position.toString() : '');
+};
+
 // Create a new user
 exports.createUser = async (req, res) => {
   try {
@@ -219,26 +245,29 @@ exports.getUserById = async (req, res) => {
         categoryData.totalPoints += pointsEarned;
 
         // Create tournament entry
-        const tournamentEntry = {
-          tournament: {
-            _id: tournament._id,
-            name: tournament.name,
-            date: tournament.date,
-            location: tournament.location,
-            status: tournament.status
-          },
-          participation: {
-            position: entry.position,
-            position2: entry.position2,
-            memberId: entry.user1?.toString() === user._id.toString() ? entry.memberId : entry.memberIdTwo,
-            pointsEarned: pointsEarned,
-            // Partner info for doubles
-            partner: entry.categoryType === 'doubles' ? {
-              userId: entry.user1?.toString() === user._id.toString() ? entry.user2 : entry.user1,
-              name: entry.user1?.toString() === user._id.toString() ? entry.player2 : entry.player1
-            } : null
-          }
-        };
+const tournamentEntry = {
+  tournament: {
+    _id: tournament._id,
+    name: tournament.name,
+    date: tournament.date,
+    location: tournament.location,
+    status: tournament.status
+  },
+  participation: {
+    position: entry.position, 
+    position2: entry.position2,
+    displayPosition: getDisplayPosition(entry.position), 
+    displayPosition2: getDisplayPosition(entry.position2), 
+    memberId: entry.user1?.toString() === user._id.toString() ? entry.memberId : entry.memberIdTwo,
+    pointsEarned: pointsEarned,
+    // Partner info for doubles
+    partner: entry.categoryType === 'doubles' ? {
+      userId: entry.user1?.toString() === user._id.toString() ? entry.user2 : entry.user1,
+      name: entry.user1?.toString() === user._id.toString() ? entry.player2 : entry.player1,
+      memberId: entry.user1?.toString() === user._id.toString() ? entry.memberIdTwo : entry.memberId
+    } : null
+  }
+};
 
         categoryData.tournaments.push(tournamentEntry);
       });
