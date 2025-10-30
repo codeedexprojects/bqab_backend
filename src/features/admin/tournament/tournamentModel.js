@@ -7,7 +7,11 @@ const tournamentSchema = new mongoose.Schema(
       required: [true, 'Tournament name is required'],
       trim: true
     },
-    date: {
+    start_date: {
+      type: Date,
+      default: Date.now
+    },
+    end_date: {
       type: Date,
       default: Date.now
     },
@@ -27,25 +31,15 @@ const tournamentSchema = new mongoose.Schema(
           type: String,
           enum: ['singles', 'doubles']
         },
-        memberId: {
-          type: String
-        },
-        memberIdTwo: {
-          type: String
-        },
-        player1: {
-          type: String
-        },
-        player2: {
-          type: String
-        },
+        memberId: String,
+        memberIdTwo: String,
+        player1: String,
+        player2: String,
         position: {
           type: Number,
           required: true
         },
-        position2: {
-          type: Number
-        },
+        position2: Number,
         user1: {
           type: mongoose.Schema.Types.ObjectId,
           ref: 'User'
@@ -53,13 +47,34 @@ const tournamentSchema = new mongoose.Schema(
         user2: {
           type: mongoose.Schema.Types.ObjectId,
           ref: 'User'
-        }
+        },
+        pointsEarned: Number, 
+        pointsEarnedUser1: Number,
+        pointsEarnedUser2: Number
       }
     ],
     categories: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Category'
     }],
+       umpires: [{
+      umpire: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Umpire'
+      },
+      role: {
+        type: String,
+      },
+      categories: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Category'
+      }],
+      assignedDate: {
+        type: Date,
+        default: Date.now
+      }
+    }],
+
     status: {
       type: String,
       enum: ['pending', 'completed', 'cancelled'],
@@ -68,7 +83,31 @@ const tournamentSchema = new mongoose.Schema(
     isActive: {
       type: Boolean,
       default: true
-    }
+    },
+    originalFileName: String,
+    fileHash: {
+      type: String,
+      unique: true,
+      sparse: true
+    },
+    // Tournament rankings cache
+    categoryRankings: [{
+      category: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Category'
+      },
+      categoryName: String,
+      rankings: [{
+        user: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User'
+        },
+        qid: String,
+        name: String,
+        points: Number,
+        position: Number
+      }]
+    }]
   },
   { timestamps: true }
 );
