@@ -91,13 +91,20 @@ exports.getClubByClubId = async (req, res) => {
   }
 };
 
-// Create new club
+// Create new club with logo
 exports.createClub = async (req, res) => {
   const { name, mobileNumbers, address, isActive } = req.body;
 
   try {
-   
-    
+    // Check if logo file exists
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: [{ field: 'logo', message: 'Club logo is required' }]
+      });
+    }
+
     // Check for duplicate club name
     const existingClub = await Club.findOne({ name });
     if (existingClub) {
@@ -110,14 +117,13 @@ exports.createClub = async (req, res) => {
 
     const club = new Club({
       name,
+      logo: req.file.filename, // Store the filename directly like in Product controller
       mobileNumbers: mobileNumbers || [],
       address: address || {},
       isActive: isActive !== undefined ? isActive : true
     });
 
-
     await club.save();
-
 
     const newClub = await Club.findById(club._id)
       .select('-__v');
@@ -152,7 +158,8 @@ exports.createClub = async (req, res) => {
     });
   }
 };
-// Update club by ID
+
+// Update club by ID with logo
 exports.updateClubById = async (req, res) => {
   const { name, isActive } = req.body;
 
@@ -177,6 +184,11 @@ exports.updateClubById = async (req, res) => {
           errors: [{ field: 'name', message: 'Club name already exists' }]
         });
       }
+    }
+
+    // Update logo if new file is uploaded
+    if (req.file) {
+      club.logo = req.file.filename;
     }
 
     // Update allowed fields
@@ -217,7 +229,7 @@ exports.updateClubById = async (req, res) => {
   }
 };
 
-// Update club by clubId (numeric)
+// Update club by clubId (numeric) with logo
 exports.updateClubByClubId = async (req, res) => {
   const { name, isActive } = req.body;
 
@@ -252,6 +264,11 @@ exports.updateClubByClubId = async (req, res) => {
           errors: [{ field: 'name', message: 'Club name already exists' }]
         });
       }
+    }
+
+    // Update logo if new file is uploaded
+    if (req.file) {
+      club.logo = req.file.filename;
     }
 
     // Update allowed fields
