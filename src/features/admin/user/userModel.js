@@ -4,24 +4,19 @@ const userSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, 'Name is required'],
-      minlength: [3, 'Name must be at least 3 characters long'],
+      required: false,
+      trim: true
     },
     qid: {
       type: String,
-      required: false, 
+      required: false,
+      trim: true
     },
+
     club: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Club',
-      required: [true, 'Club is required'],
-      validate: {
-        validator: async function (clubId) {
-          const club = await mongoose.model('Club').findById(clubId);
-          return club !== null;
-        },
-        message: 'Invalid club ID. Club does not exist.'
-      }
+      required: false,
     },
     country: {
       type: String,
@@ -31,6 +26,11 @@ const userSchema = new mongoose.Schema(
       type: Date,
       required: false,
     },
+    passport: {
+      type: String,
+      required: false,
+    },
+    
     gender: {
       type: String,
       enum: ['male', 'female', 'other'],
@@ -42,6 +42,7 @@ const userSchema = new mongoose.Schema(
       sparse: true,
       validate: {
         validator: function (v) {
+          if (!v) return true;
           const phoneRegex = /^[0-9]{10,15}$/; 
           return phoneRegex.test(v);
         },
@@ -53,9 +54,64 @@ const userSchema = new mongoose.Schema(
       enum: ['a', 'b', 'c', 'd', 'e', 'open'],
       required: false,
     },
-
-    role: { type: String, default: 'customer' },
- 
+    points: {
+      type: Number,
+      default: 0
+    },
+      totalPoints: {
+      type: Number,
+      default: 0
+    },
+    // Store points by category - using an array of objects instead of Map
+      categoryPoints: [{
+      category: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Category',
+        required: true
+      },
+      categoryName: String,
+      categoryType: String,
+      points: {
+        type: Number,
+        default: 0
+      },
+      tournamentsCount: {
+        type: Number,
+        default: 0
+      },
+      lastUpdated: {
+        type: Date,
+        default: Date.now
+      }
+    }],
+  pointsHistory: [{
+      tournament: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Tournament',
+        required: true
+      },
+      tournamentName: String,
+      category: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Category',
+        required: true
+      },
+      categoryName: String,
+      categoryType: String,
+      pointsEarned: {
+        type: Number,
+        required: true
+      },
+      position: Number,
+      date: {
+        type: Date,
+        default: Date.now
+      }
+    }],
+    role: { 
+      type: String, 
+      default: 'customer' 
+    },
     isActive: {
       type: Boolean,
       default: true,
@@ -64,6 +120,8 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-
+// Add a compound index to ensure unique category entries per user
+userSchema.index({ 'categoryPoints.category': 1 });
+userSchema.index({ totalPoints: -1 });
 
 module.exports = mongoose.model('User', userSchema);
