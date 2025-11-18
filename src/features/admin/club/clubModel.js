@@ -12,14 +12,16 @@ const clubSchema = new mongoose.Schema(
       minlength: [3, 'Name must be at least 3 characters long'],
       trim: true,
     },
+    logo: {
+      type: String,
+      default: null,
+      trim: true,
+    },
     mobileNumbers: {
       type: [String],
       validate: {
         validator: function(v) {
-          // Check if array length is within limit
           if (v.length > 3) return false;
-          
-          // Validate each mobile number
           for (let num of v) {
             if (!/^[0-9]{10}$/.test(num)) return false;
           }
@@ -30,21 +32,9 @@ const clubSchema = new mongoose.Schema(
       default: []
     },
     address: {
-      street: {
-        type: String,
-        trim: true,
-        maxlength: [200, 'Street address cannot exceed 200 characters']
-      },
-      city: {
-        type: String,
-        trim: true,
-        maxlength: [50, 'City cannot exceed 50 characters']
-      },
-      state: {
-        type: String,
-        trim: true,
-        maxlength: [50, 'State cannot exceed 50 characters']
-      },
+      street: { type: String, trim: true, maxlength: [200, 'Street address cannot exceed 200 characters'] },
+      city: { type: String, trim: true, maxlength: [50, 'City cannot exceed 50 characters'] },
+      state: { type: String, trim: true, maxlength: [50, 'State cannot exceed 50 characters'] },
       zipCode: {
         type: String,
         trim: true,
@@ -55,12 +45,7 @@ const clubSchema = new mongoose.Schema(
           message: 'Zip code must be 5-6 digits'
         }
       },
-      country: {
-        type: String,
-        trim: true,
-        default: 'India',
-        maxlength: [50, 'Country cannot exceed 50 characters']
-      }
+      country: { type: String, trim: true, default: 'India', maxlength: [50, 'Country cannot exceed 50 characters'] }
     },
     isActive: {
       type: Boolean,
