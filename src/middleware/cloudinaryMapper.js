@@ -1,7 +1,7 @@
 module.exports = (req, res, next) => {
   if (req.files && req.files.length > 0) {
     req.body.images = req.files.map((file) => ({
-      url: file.path,       // ✅ Cloudinary URL
+      url: file.path,       // Cloudinary URL
       public_id: file.filename,
     }));
   }
@@ -14,5 +14,4 @@ module.exports = (req, res, next) => {
   }
 
   next();
-};
 };
