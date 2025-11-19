@@ -1,5 +1,3 @@
-
-// Middleware to map Cloudinary files into req.body.images
 module.exports = (req, res, next) => {
   if (req.files && req.files.length > 0) {
     req.body.images = req.files.map((file) => ({
