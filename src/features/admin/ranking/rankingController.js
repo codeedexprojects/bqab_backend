@@ -772,3 +772,89 @@ exports.getRankingsByType = async (req, res) => {
     });
   }
 };  
+
+
+// Search rankings by user name or QID
+// exports.searchRankings = async (req, res) => {
+//   try {
+//     const { query, limit = 50, page = 1 } = req.query;
+//     const skip = (page - 1) * limit;
+//     if (!query) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Search query is required',
+//         errors: [{ message: 'Please provide a search query parameter' }]
+//       });
+//     }
+//     const regex = new RegExp(query, 'i'); 
+
+//     const users = await User.find({
+//       isActive: true,
+//       $or: [
+//         { name: regex },
+//         { qid: regex }
+//       ]
+//     })  .select('name qid club totalPoints categoryPoints')
+//       .populate('club', 'name')
+//       .sort({ totalPoints: -1 })
+//       .skip(skip)
+//       .limit(parseInt(limit));
+//     const totalUsers = await User.countDocuments({
+//       isActive: true,
+//       $or: [
+//         { name: regex },
+//         { qid: regex }
+//       ]
+//     }); 
+//     // Add ranking position
+//     const usersWithRanking = users.map((user, index) => ({
+//       rank: skip + index + 1,
+//       ...user.toObject()
+//     }));
+//     res.status(200).json({
+//       success: true,
+//       message: 'Search results retrieved successfully', 
+//       data: {
+//         users: usersWithRanking,
+//         pagination: {   
+//           currentPage: parseInt(page),
+//           totalPages: Math.ceil(totalUsers / limit),
+//           totalUsers,
+//           hasNext: skip + users.length < totalUsers,
+//           hasPrev: page > 1
+//         }
+//       }
+//     });
+//   } catch (error) {
+//     console.error('Search Rankings Error:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Server error',
+//       errors: [{ message: error.message }]
+//     });
+//   }
+// };
+
+exports.searchRankings = async (req, res) => {
+  try {    
+    const search=req.query.q;
+    const users=await User.find({$or:[{name:{$regex:search,$options:'i'}},{qid:{$regex:search,$options:'i'}}] })
+    console.log(users,"jhj");
+
+    if(users.length===0){
+      return res.status(404).json({ success: false, message: 'No users found' });
+    }
+    
+
+    res.json({success:true,message:'Search results retrieved successfully',data:users})
+    if(!users){
+      return res.status(404).json({ success: false, message: 'No users found matching the search criteria' });
+    }
+    
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });    
+  }
+
+}
+
+
