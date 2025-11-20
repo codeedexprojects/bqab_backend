@@ -20,6 +20,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.19.1",
     "multer": "^2.0.2",
+    "multer-storage-cloudinary": "^4.0.0",
     "winston": "^3.18.3",
     "xlsx": "^0.18.5"
   }
