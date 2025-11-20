@@ -1,2 +1,17 @@
-.env*
-.node_modules
+# Node modules
+node_modules/
+
+# Logs
+logs/*.log
+logs/
+
+# Env files
+.env
+
+# Upload folders
+src/uploads/
+src/uploads/profiles/
+
+# OS files
+.DS_Store
+Thumbs.db
