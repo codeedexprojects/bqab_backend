@@ -4,6 +4,7 @@ const cors = require('cors');
 const errorMiddleware = require('./middleware/errorMiddleware');
 
 const app = express();
+require("dotenv").config();
 
 app.use(helmet());
 app.use(cors());
