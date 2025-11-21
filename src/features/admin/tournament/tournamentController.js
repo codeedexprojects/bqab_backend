@@ -86,7 +86,6 @@ function generateRandomMemberId() {
 // Enhanced create tournament with optimized batch processing
 exports.createTournamentFromExcel = async (req, res) => {
   let session;
-
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -117,14 +116,23 @@ exports.createTournamentFromExcel = async (req, res) => {
       });
     }
 
+
+
     // Check for duplicate file
     const originalFileName = req.file.originalname;
-    const fileHash = generateFileHash(req.file.path);
+    // const fileHash = generateFileHash(req.file.path);
+    // console.log(fileHash,"klkl");
+    
 
-    const [existingByName, existingByHash] = await Promise.all([
-      Tournament.findOne({ originalFileName: originalFileName }),
-      Tournament.findOne({ fileHash: fileHash }),
-    ]);
+    // const [existingByName, existingByHash] = await Promise.all([
+    //   Tournament.findOne({ originalFileName: originalFileName }),
+    //   Tournament.findOne({ fileHash: fileHash }),
+    // ]);
+
+
+    const existingByName = await Tournament.findOne({originalFileName });
+
+
 
     if (existingByName) {
       cleanupFile(req.file);
@@ -140,19 +148,19 @@ exports.createTournamentFromExcel = async (req, res) => {
       });
     }
 
-    if (existingByHash) {
-      cleanupFile(req.file);
-      return res.status(409).json({
-        success: false,
-        message: "Duplicate file content",
-        errors: [
-          {
-            field: "file",
-            message: "This exact file has already been uploaded previously.",
-          },
-        ],
-      });
-    }
+    // if (existingByHash) {
+    //   cleanupFile(req.file);
+    //   return res.status(409).json({
+    //     success: false,
+    //     message: "Duplicate file content",
+    //     errors: [
+    //       {
+    //         field: "file",
+    //         message: "This exact file has already been uploaded previously.",
+    //       },
+    //     ],
+    //   });
+    // }
 
     // Start transaction
     session = await mongoose.startSession();
@@ -304,7 +312,7 @@ exports.createTournamentFromExcel = async (req, res) => {
       categories: [...categoryCache.values()].map((cat) => cat._id),
       status: "completed",
       originalFileName: originalFileName,
-      fileHash: fileHash,
+      // fileHash: fileHash,
     });
 
     await tournament.save({ session });
@@ -1091,6 +1099,7 @@ exports.getTournamentWithRankings = async (req, res) => {
     });
   }
 };
+
 exports.deleteTournament = async (req, res) => {
   let session;
 
@@ -1202,3 +1211,35 @@ async function revertUserCategoryPoints(
     throw error;
   }
 }
+
+
+exports.updateTournament = async (req, res) => {
+  try {
+    const tournamentId = req.params.tournamentId;
+    const updateData = req.body;  
+    const tournament = await Tournament.findByIdAndUpdate(
+      tournamentId,
+      updateData,
+      { new: true }
+    );  
+    if (!tournament) {
+      return res.status(404).json({
+        success: false,
+        message: "Tournament not found",
+        errors: [{ message: "No tournament found with this ID" }],
+      });
+    }
+    res.status(200).json({
+      success: true,
+      message: "Tournament updated successfully",
+      data: tournament,
+    });
+  } catch (error) {
+    console.error("Update Tournament Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      errors: [{ message: error.message }],
+    });
+  }
+};

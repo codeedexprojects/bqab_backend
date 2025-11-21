@@ -19,6 +19,7 @@ exports.createUser = async (req, res) => {
       isActive = true
     } = req.body;
 
+    
     // Check for duplicate mobile number if provided
     if (mobile) {
       const existingUser = await User.findOne({ mobile });
@@ -119,6 +120,7 @@ exports.createUser = async (req, res) => {
     });
   }
 };
+
 
 // Keep other functions (getAllUsers, getUserById, updateUserById, deleteUserById) the same
 exports.getAllUsers = async (req, res) => {

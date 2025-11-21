@@ -24,10 +24,18 @@ router.post(
   tournamentController.createTournamentFromExcel
 );
 
+
 router.delete(
   '/:tournamentId', 
   verifyAdminToken(['admin']), 
   tournamentController.deleteTournament
+);
+
+
+router.put(
+  '/:tournamentId', 
+  verifyAdminToken(['admin']), 
+  tournamentController.updateTournament
 );
 
 module.exports = router;

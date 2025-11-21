@@ -12,3 +12,5 @@ router.patch('/:userId', verifyAdminToken(['admin']), userIdValidator, updateUse
 router.delete('/:userId', verifyAdminToken(['admin']), userIdValidator, validationHandler, UserController.deleteUserById);
 
 module.exports = router;
+
+
