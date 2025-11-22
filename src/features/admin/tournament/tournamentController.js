@@ -1217,6 +1217,7 @@ exports.updateTournament = async (req, res) => {
   try {
     const tournamentId = req.params.tournamentId;
     const updateData = req.body;  
+    
     const tournament = await Tournament.findByIdAndUpdate(
       tournamentId,
       updateData,
