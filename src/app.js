@@ -27,7 +27,7 @@ const admintournamentRoutes = require('./features/admin/tournament/tournamentRou
 const adminCategoryRoutes = require('./features/admin/category/categoryRoute')
 const adminRankingRoutes = require('./features/admin/ranking/rankingRoutes')
 const adminUmpireRoutes = require('./features/admin/umpire/umpireRoute')
-
+const dashboardRoutes = require('./features/admin/dashboard/dashboardRoute')
 
 
 
@@ -41,7 +41,7 @@ app.use('/admin/tournament',admintournamentRoutes)
 app.use('/admin/category',adminCategoryRoutes)
 app.use('/admin/ranking',adminRankingRoutes)
 app.use('/admin/umpire',adminUmpireRoutes)
-
+app.use('/admin/dashboard',dashboardRoutes)
 
 
 

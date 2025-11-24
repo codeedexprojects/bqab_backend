@@ -1,3 +1,4 @@
+
 const Tournament = require("./tournamentModel");
 const User = require("../user/userModel");
 const Category = require("../category/categoryModel");
@@ -5,7 +6,7 @@ const XLSX = require("xlsx");
 const mongoose = require("mongoose");
 const crypto = require("crypto");
 const fs = require("fs");
-
+const path = require("path"); 
 // Points mapping based on position
 const POINTS_MAPPING = {
   1: 100,
