@@ -2,7 +2,7 @@ const express = require('express');
 const verifyAdminToken = require('../../../middleware/jwtConfig');
 const router = express.Router();
 const tournamentController = require('./tournamentController');
-const uploadExcel = require('../../../config/multerExcelConfig');
+const uploadExcel = require('../../../middleware/multerExcelConfig');
 // Tournament routes with admin verification
 router.get(
   '/', 
