@@ -2,6 +2,11 @@ const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema(
   {
+    si_no: {
+      type: Number,
+      unique: true,
+      sparse: true,
+    },
     name: {
       type: String,
       required: false,
@@ -140,7 +145,26 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+userSchema.pre('save', async function (next) {
+  if (this.isNew) {
+    try {
+      const counter = await Counter.findByIdAndUpdate(
+        { _id: 'userSiNo' },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true }
+      );
+      this.si_no = counter.seq;
+      next();
+    } catch (error) {
+      next(error);
+    }
+  } else {
+    next();
+  }
+});
+
 // Compound indexes
+userSchema.index({ si_no: 1 });
 userSchema.index({ "categoryPoints.category": 1 });
 userSchema.index({ totalPoints: -1 });
 userSchema.index({ email: 1 }, { sparse: true });

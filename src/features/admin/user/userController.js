@@ -2,7 +2,6 @@ const User = require("./userModel");
 const mongoose = require("mongoose");
 const Tournament = require("../tournament/tournamentModel");
 
-// Position display mapping
 const POSITION_DISPLAY_MAPPING = {
   1: "Winner",
   2: "Runner-Up",
@@ -22,7 +21,6 @@ const POSITION_DISPLAY_MAPPING = {
   16: "Pre-Quarter",
 };
 
-// Helper function to get display position
 const getDisplayPosition = (position) => {
   return (
     POSITION_DISPLAY_MAPPING[position] || (position ? position.toString() : "")
@@ -46,7 +44,6 @@ exports.createUser = async (req, res) => {
       isActive = "true",
     } = req.body;
 
-    // Check for required fields
     if (!email) {
       return res.status(400).json({
         success: false,
@@ -55,7 +52,6 @@ exports.createUser = async (req, res) => {
       });
     }
 
-    // Validate email format
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return res.status(400).json({
         success: false,
@@ -66,7 +62,6 @@ exports.createUser = async (req, res) => {
       });
     }
 
-    // Check for duplicate email
     const existingEmailUser = await User.findOne({ email });
     if (existingEmailUser) {
       return res.status(400).json({
@@ -76,7 +71,6 @@ exports.createUser = async (req, res) => {
       });
     }
 
-    // Check for duplicate mobile number if provided
     if (mobile) {
       const existingUser = await User.findOne({ mobile });
       if (existingUser) {
@@ -90,14 +84,10 @@ exports.createUser = async (req, res) => {
       }
     }
 
-    // Convert string booleans to actual booleans
     const isActiveBool = isActive === "true";
 
-    // Handle image - use the path from cloudinaryMapper
-    const imageUrl = req.body.image || ""; 
+    const imageUrl = req.body.image || "";
 
-
-    // Create new user
     const newUser = new User({
       name: name || "",
       email: email,
@@ -116,7 +106,6 @@ exports.createUser = async (req, res) => {
 
     await newUser.save();
 
-    // Fetch the created user with populated club
     const createdUser = await User.findById(newUser._id)
       .select("-__v")
       .populate("club", "name");
@@ -130,7 +119,6 @@ exports.createUser = async (req, res) => {
     console.error("Create User Error:", error);
     console.error("Error Stack:", error.stack);
 
-    // Handle MongoDB duplicate key errors
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern)[0];
       return res.status(400).json({
@@ -140,7 +128,6 @@ exports.createUser = async (req, res) => {
       });
     }
 
-    // Handle Mongoose validation errors
     if (error.name === "ValidationError") {
       const errors = Object.values(error.errors).map((err) => ({
         field: err.path,
@@ -188,7 +175,6 @@ exports.updateUserById = async (req, res) => {
       });
     }
 
-    // Check for duplicate email
     if (email && email !== user.email) {
       const existingEmailUser = await User.findOne({
         email,
@@ -203,7 +189,6 @@ exports.updateUserById = async (req, res) => {
       }
     }
 
-    // Check for duplicate mobile number
     if (mobile && mobile !== user.mobile) {
       const existingUser = await User.findOne({
         mobile,
@@ -220,14 +205,11 @@ exports.updateUserById = async (req, res) => {
       }
     }
 
-    // FIX: Handle image update from file upload only
     let imageUpdate = undefined;
     if (req.file) {
-      imageUpdate = req.file.path; 
+      imageUpdate = req.file.path;
     }
-    // Remove the else if condition that checks req.body.image
 
-    // Update allowed fields including email and image
     if (name !== undefined) user.name = name;
     if (email !== undefined) user.email = email;
     if (imageUpdate !== undefined) user.image = imageUpdate;
@@ -285,14 +267,12 @@ exports.updateUserById = async (req, res) => {
   }
 };
 
-// Keep other functions (getAllUsers, getUserById, updateUserById, deleteUserById) the same
 exports.getAllUsers = async (req, res) => {
   try {
     const users = await User.find()
       .select("-__v")
       .populate("club", "name")
-      .sort({ createdAt: -1 });
-
+      .sort({ si_no: 1 });
     res.status(200).json({
       success: true,
       message: "Users retrieved successfully",
@@ -311,7 +291,6 @@ exports.getAllUsers = async (req, res) => {
 
 exports.getUserById = async (req, res) => {
   try {
-    // Get basic user info with club details
     const user = await User.findById(req.params.userId)
       .select("-__v")
       .populate("club", "name");
@@ -324,7 +303,6 @@ exports.getUserById = async (req, res) => {
       });
     }
 
-    // Get all tournaments where this user participated
     const userTournaments = await Tournament.find({
       $or: [{ "players.user1": user._id }, { "players.user2": user._id }],
     })
@@ -332,11 +310,9 @@ exports.getUserById = async (req, res) => {
       .select("name date location status players categories")
       .sort({ date: -1 });
 
-    // Group data by category first, then tournaments within each category
     const categoryMap = new Map();
 
     userTournaments.forEach((tournament) => {
-      // Find all categories user participated in this tournament
       const userEntries = tournament.players.filter(
         (player) =>
           player.user1?.toString() === user._id.toString() ||
@@ -348,9 +324,7 @@ exports.getUserById = async (req, res) => {
 
         if (!categoryId) return;
 
-        // Get or create category entry
         if (!categoryMap.has(categoryId)) {
-          // Find category details from tournament categories or use entry data
           const categoryDetails = tournament.categories.find(
             (cat) => cat._id.toString() === categoryId
           ) || {
@@ -372,7 +346,6 @@ exports.getUserById = async (req, res) => {
 
         const categoryData = categoryMap.get(categoryId);
 
-        // Calculate points for this tournament entry
         const pointsEarned =
           user.pointsHistory.find(
             (ph) =>
@@ -380,10 +353,8 @@ exports.getUserById = async (req, res) => {
               ph.category?.toString() === categoryId
           )?.pointsEarned || 0;
 
-        // Add points to category total
         categoryData.totalPoints += pointsEarned;
 
-        // Create tournament entry
         const tournamentEntry = {
           tournament: {
             _id: tournament._id,
@@ -402,7 +373,6 @@ exports.getUserById = async (req, res) => {
                 ? entry.memberId
                 : entry.memberIdTwo,
             pointsEarned: pointsEarned,
-            // Partner info for doubles
             partner:
               entry.categoryType === "doubles"
                 ? {
@@ -427,7 +397,6 @@ exports.getUserById = async (req, res) => {
       });
     });
 
-    // Convert map to array and sort tournaments by date within each category
     const categoriesWithTournaments = Array.from(categoryMap.values()).map(
       (categoryData) => ({
         ...categoryData,
@@ -437,17 +406,15 @@ exports.getUserById = async (req, res) => {
       })
     );
 
-    // Calculate summary statistics
     const totalTournaments = new Set();
     userTournaments.forEach((tournament) => {
       totalTournaments.add(tournament._id.toString());
     });
 
-    // Format the response as requested - Category first, then tournaments
     const response = {
-      // User basic information
       user: {
         _id: user._id,
+        si_no: user.si_no,
         name: user.name,
         qid: user.qid,
         club: user.club,
@@ -464,10 +431,8 @@ exports.getUserById = async (req, res) => {
         updatedAt: user.updatedAt,
       },
 
-      // Category-wise participation (grouped by category)
       categoryParticipation: categoriesWithTournaments,
 
-      // Summary statistics
       summary: {
         totalTournaments: totalTournaments.size,
         totalCategories: categoriesWithTournaments.length,
