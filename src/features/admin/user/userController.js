@@ -307,8 +307,8 @@ exports.getUserById = async (req, res) => {
       $or: [{ "players.user1": user._id }, { "players.user2": user._id }],
     })
       .populate("categories", "name type")
-      .select("name date location status players categories")
-      .sort({ date: -1 });
+      .select("name start_date end_date location status players categories")
+      .sort({ end_date: -1 });
 
     const categoryMap = new Map();
 
@@ -359,7 +359,8 @@ exports.getUserById = async (req, res) => {
           tournament: {
             _id: tournament._id,
             name: tournament.name,
-            date: tournament.date,
+            start_date: tournament.start_date,
+            end_date: tournament.end_date,
             location: tournament.location,
             status: tournament.status,
           },
