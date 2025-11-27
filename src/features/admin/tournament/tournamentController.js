@@ -86,7 +86,6 @@ function generateRandomMemberId() {
 
 // Enhanced create tournament with optimized batch processing
 exports.createTournamentFromExcel = async (req, res) => {
-  console.log("hdhudhu")
   let session;
 
   try {
