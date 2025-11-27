@@ -105,14 +105,7 @@ exports.createClub = async (req, res) => {
   let { name, mobileNumbers, address, isActive } = req.body;
 
   try {
-    // Check if logo file exists
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: [{ field: 'logo', message: 'Club logo is required' }]
-      });
-    }
+ 
 
     // Parse mobileNumbers if it's a string (from FormData)
     if (typeof mobileNumbers === 'string') {
