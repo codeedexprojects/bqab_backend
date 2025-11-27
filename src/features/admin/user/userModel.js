@@ -62,14 +62,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       unique: true,
       sparse: true,
-      validate: {
-        validator: function (v) {
-          if (!v) return true;
-          const phoneRegex = /^[0-9]{10,15}$/;
-          return phoneRegex.test(v);
-        },
-        message: (props) => `${props.value} is not a valid phone number!`,
-      },
+    
     },
     level: {
       type: String,
