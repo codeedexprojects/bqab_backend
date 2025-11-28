@@ -64,11 +64,6 @@ const userSchema = new mongoose.Schema(
       sparse: true,
     
     },
-    level: {
-      type: String,
-      enum: ["a", "b", "c", "d", "e", "open"],
-      required: false,
-    },
     points: {
       type: Number,
       default: 0,
@@ -138,23 +133,22 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-userSchema.pre('save', async function (next) {
-  if (this.isNew) {
-    try {
-      const counter = await Counter.findByIdAndUpdate(
-        { _id: 'userSiNo' },
-        { $inc: { seq: 1 } },
-        { new: true, upsert: true }
-      );
-      this.si_no = counter.seq;
-      next();
-    } catch (error) {
-      next(error);
-    }
-  } else {
+userSchema.pre("save", async function (next) {
+  if (!this.isNew) return next();
+
+  try {
+    const lastUser = await mongoose.model("User")
+      .findOne({}, { si_no: 1 })
+      .sort({ si_no: -1 });
+
+    this.si_no = lastUser ? lastUser.si_no + 1 : 1;
+
     next();
+  } catch (error) {
+    next(error);
   }
 });
+
 
 // Compound indexes
 userSchema.index({ si_no: 1 });

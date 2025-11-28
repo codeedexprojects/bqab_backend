@@ -417,7 +417,7 @@ exports.getUserById = async (req, res) => {
         _id: user._id,
         si_no: user.si_no,
         name: user.name,
-        image: user.image, 
+        image: user.image,
         qid: user.qid,
         club: user.club,
         country: user.country,
