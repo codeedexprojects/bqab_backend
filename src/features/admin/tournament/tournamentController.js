@@ -7,7 +7,6 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 
-// Updated POINTS_MAPPING with clear singles/doubles distinction
 const POINTS_MAPPING = {
   singles: {
     1: 100,
@@ -28,10 +27,10 @@ const POINTS_MAPPING = {
     16: 15,
   },
   doubles: {
-    1: 100, // Each player gets 100 points
-    2: 75, // Each player gets 75 points
-    3: 50, // Each player gets 50 points
-    4: 50, // Each player gets 50 points
+    1: 100, 
+    2: 75,
+    3: 50, 
+    4: 50, 
     5: 25,
     6: 25,
     7: 25,
@@ -47,7 +46,6 @@ const POINTS_MAPPING = {
   },
 };
 
-// Helper function to get points based on category type
 function getPointsForPosition(position, categoryType) {
   const mapping = POINTS_MAPPING[categoryType] || POINTS_MAPPING.singles;
   return mapping[position] || 0;
@@ -84,7 +82,6 @@ function detectCategoryType(categoryName) {
 
   const name = categoryName.toLowerCase().trim();
 
-  // More precise doubles detection
   const doublesPatterns = [
     /\b(doubles?|double)\b/i,
     /\b(md|wd|xd|bd|gd)\b/i,
@@ -98,17 +95,14 @@ function detectCategoryType(categoryName) {
     /s\s*[-]?\s*s/i,
   ];
 
-  // Check for doubles patterns first
   for (const pattern of doublesPatterns) {
     if (pattern.test(name)) return "doubles";
   }
 
-  // Check for singles patterns
   for (const pattern of singlesPatterns) {
     if (pattern.test(name)) return "singles";
   }
 
-  // Default to singles for safety
   return "singles";
 }
 
@@ -166,7 +160,6 @@ exports.createTournamentFromExcel = async (req, res) => {
       });
     }
 
-    // Check MongoDB connection
     if (mongoose.connection.readyState !== 1) {
       cleanupFile(req.file);
       return res.status(500).json({
@@ -176,7 +169,6 @@ exports.createTournamentFromExcel = async (req, res) => {
       });
     }
 
-    // Check for duplicate file
     const originalFileName = req.file.originalname;
     const fileHash = generateFileHash(req.file.path);
 
@@ -213,7 +205,6 @@ exports.createTournamentFromExcel = async (req, res) => {
       });
     }
 
-    // Start transaction
     session = await mongoose.startSession();
     await session.startTransaction({
       readPreference: "primary",
@@ -221,11 +212,9 @@ exports.createTournamentFromExcel = async (req, res) => {
       writeConcern: { w: "majority" },
     });
 
-    // Read Excel file
     const workbook = XLSX.readFile(req.file.path);
     const sheetNames = workbook.SheetNames;
     
-    // Filter out invalid sheet names
     const validSheetNames = sheetNames.filter((sheetName) =>
       isValidCategoryName(sheetName)
     );
@@ -244,16 +233,13 @@ exports.createTournamentFromExcel = async (req, res) => {
       });
     }
 
-    // Report skipped sheets
     const skippedSheets = sheetNames.filter(
       (sheetName) => !validSheetNames.includes(sheetName)
     );
 
-    // Pre-load all existing users and categories to reduce DB queries
     const existingUsers = await User.find({}).session(session).lean();
     const userCache = new Map(existingUsers.map((u) => [u.qid, u]));
 
-    // CRITICAL FIX: Only load categories that match the current sheet names
     const existingCategories = await Category.find({
       name: { $in: validSheetNames }
     }).session(session).lean();
@@ -270,15 +256,12 @@ exports.createTournamentFromExcel = async (req, res) => {
     const newUsersToCreate = [];
     const newCategoriesToCreate = [];
 
-    // Track categories that actually have players
     const categoriesWithPlayers = new Set();
 
-    // Process all sheets
     for (const sheetName of validSheetNames) {
       const worksheet = workbook.Sheets[sheetName];
       const data = XLSX.utils.sheet_to_json(worksheet);
 
-      // Filter out empty rows
       const nonEmptyData = data.filter((row) => !isEmptyRow(row));
 
       if (nonEmptyData.length === 0) {
@@ -287,12 +270,11 @@ exports.createTournamentFromExcel = async (req, res) => {
           playersProcessed: 0,
           status: "empty - no valid player data",
         });
-        continue; // Skip this category entirely
+        continue;
       }
 
       const categoryType = detectCategoryType(sheetName);
 
-      // Get or prepare category - ONLY for categories that have players
       let category = categoryCache.get(sheetName);
       if (!category) {
         category = {
@@ -309,7 +291,6 @@ exports.createTournamentFromExcel = async (req, res) => {
           type: category.type,
         });
       } else if (category.type !== categoryType) {
-        // Update category type if needed
         await Category.updateOne(
           { _id: category._id },
           { type: categoryType }
@@ -320,7 +301,6 @@ exports.createTournamentFromExcel = async (req, res) => {
       let categoryPlayers = 0;
       let categoryErrors = 0;
 
-      // Process all rows in parallel
       const rowPromises = nonEmptyData.map((row, index) =>
         processCategoryRowOptimized(
           row,
@@ -342,7 +322,7 @@ exports.createTournamentFromExcel = async (req, res) => {
         if (result.status === "fulfilled" && result.value) {
           allPlayers.push(result.value);
           categoryPlayers++;
-          categoriesWithPlayers.add(sheetName); // Track that this category has players
+          categoriesWithPlayers.add(sheetName); 
         } else {
           categoryErrors++;
         }
@@ -368,34 +348,29 @@ exports.createTournamentFromExcel = async (req, res) => {
       });
     }
 
-    // CRITICAL FIX: Only create categories that actually have players
     const categoriesToCreate = newCategoriesToCreate.filter(cat => 
       categoriesWithPlayers.has(cat.name)
     );
 
-    // Bulk create new categories (only those with players)
     if (categoriesToCreate.length > 0) {
       await Category.insertMany(categoriesToCreate, { session });
     }
 
-    // Bulk create new users
     if (newUsersToCreate.length > 0) {
       await User.insertMany(newUsersToCreate, { session });
     }
 
-    // CRITICAL FIX: Only include categories that have players in the tournament
     const tournamentCategories = Array.from(categoriesWithPlayers).map(categoryName => {
       return categoryCache.get(categoryName)._id;
     });
 
-    // Create tournament
     const tournament = new Tournament({
       name,
       location: location || "",
       start_date: start_date || new Date(),
       end_date: end_date || new Date(),
       players: allPlayers,
-      categories: tournamentCategories, // Only categories with players
+      categories: tournamentCategories, 
       status: "completed",
       originalFileName: originalFileName,
       fileHash: fileHash,
@@ -403,7 +378,6 @@ exports.createTournamentFromExcel = async (req, res) => {
 
     await tournament.save({ session });
 
-    // Bulk update user points
     await bulkUpdateUserPoints(userPointsMap, tournament, session);
 
     await session.commitTransaction();
@@ -419,7 +393,7 @@ exports.createTournamentFromExcel = async (req, res) => {
           start_date: tournament.start_date,
           end_date: tournament.end_date,
           playersCount: allPlayers.length,
-          categoriesProcessed: categoriesWithPlayers.size, // Actual categories with players
+          categoriesProcessed: categoriesWithPlayers.size, 
           originalFileName: tournament.originalFileName,
         },
         warnings:
@@ -429,7 +403,7 @@ exports.createTournamentFromExcel = async (req, res) => {
                 reason: "Sheet names were invalid or placeholder names",
               }
             : undefined,
-        categories: categoryStats.filter(cat => cat.playersProcessed > 0), // Only show categories with players
+        categories: categoryStats.filter(cat => cat.playersProcessed > 0), 
         createdCategories: createdCategories.filter(cat => 
           categoriesWithPlayers.has(cat.name)
         ),
@@ -471,7 +445,6 @@ exports.createTournamentFromExcel = async (req, res) => {
   }
 };
 
-// Optimized row processing with cache
 async function processCategoryRowOptimized(
   row,
   rowIndex,
@@ -485,7 +458,6 @@ async function processCategoryRowOptimized(
   newUsersToCreate
 ) {
   try {
-    // Skip empty rows - FIXED: Use the function directly, not this.isEmptyRow
     if (isEmptyRow(row)) {
       return null;
     }
@@ -497,7 +469,6 @@ async function processCategoryRowOptimized(
     const position = parseInt(row["Position"] || 0);
     const position2 = parseInt(row["Position2"] || position || 0);
 
-    // Validate position
     if (!position || position < 1 || position > 16) {
       errors.push({
         category: sheetName,
@@ -508,7 +479,6 @@ async function processCategoryRowOptimized(
       return null;
     }
 
-    // Generate member IDs if needed
     if (!memberId && player1) {
       memberId = getOrGenerateMemberId(player1, generatedMemberIds, userCache);
     }
@@ -521,7 +491,6 @@ async function processCategoryRowOptimized(
       );
     }
 
-    // Validate required fields based on category type - FIXED: Use the function directly
     const validationError = validatePlayerData(
       row,
       category.type,
@@ -541,14 +510,12 @@ async function processCategoryRowOptimized(
       position2: category.type === "doubles" ? position2 : undefined,
     };
 
-    // Calculate points based on category type
     const points1 = getPointsForPosition(position, category.type);
     const points2 =
       category.type === "doubles"
         ? getPointsForPosition(position2, category.type)
         : 0;
 
-    // Handle Player 1
     if (memberId && player1) {
       const userId = getOrCreateUser(
         memberId,
@@ -564,7 +531,7 @@ async function processCategoryRowOptimized(
         memberId,
         player1,
         category,
-        points1, // Full points for singles, full points for doubles player1
+        points1, 
         position,
         userPointsMap
       );
@@ -575,7 +542,6 @@ async function processCategoryRowOptimized(
       playersData.pointsEarnedUser1 = points1;
     }
 
-    // Handle Player 2 (doubles) - gets full points as well
     if (category.type === "doubles" && memberIdTwo && player2) {
       const userId = getOrCreateUser(
         memberIdTwo,
@@ -591,7 +557,7 @@ async function processCategoryRowOptimized(
         memberIdTwo,
         player2,
         category,
-        points2, // Full points for doubles player2
+        points2, 
         position2,
         userPointsMap
       );
@@ -602,7 +568,6 @@ async function processCategoryRowOptimized(
       playersData.pointsEarnedUser2 = points2;
     }
 
-    // For singles, set total points
     if (category.type === "singles") {
       playersData.pointsEarned = points1;
     }
@@ -619,7 +584,6 @@ async function processCategoryRowOptimized(
   }
 }
 
-// Helper function to check if row is empty
 function isEmptyRow(row) {
   const values = Object.values(row);
   return values.every(value => 
@@ -629,7 +593,6 @@ function isEmptyRow(row) {
   );
 }
 
-// Helper function to validate player data
 function validatePlayerData(row, categoryType, categoryName, rowIndex) {
   const player1 = (row["Player1"] || "").toString().trim();
   const player2 = (row["Player2"] || "").toString().trim();
@@ -665,7 +628,6 @@ function validatePlayerData(row, categoryType, categoryName, rowIndex) {
   return null;
 }
 
-// Check if row is empty
 function isEmptyRow(row) {
   const values = Object.values(row);
   return values.every(
@@ -674,22 +636,18 @@ function isEmptyRow(row) {
   );
 }
 
-// Helper to get or generate member ID
 function getOrGenerateMemberId(playerName, generatedMemberIds, userCache) {
   const playerKey = playerName.toLowerCase();
 
-  // Check if already generated in this session
   if (generatedMemberIds.has(playerKey)) {
     return generatedMemberIds.get(playerKey);
   }
 
-  // Generate new unique ID
   let attempts = 0;
   let newMemberId;
 
   while (attempts < 10) {
     newMemberId = generateRandomMemberId();
-    // Check against cache
     if (!userCache.has(newMemberId) && !generatedMemberIds.has(newMemberId)) {
       generatedMemberIds.set(playerKey, newMemberId);
       return newMemberId;
@@ -700,7 +658,6 @@ function getOrGenerateMemberId(playerName, generatedMemberIds, userCache) {
   return null;
 }
 
-// Helper to get or create user
 function getOrCreateUser(
   memberId,
   playerName,
@@ -736,7 +693,6 @@ function getOrCreateUser(
   return user._id;
 }
 
-// Helper to update user points map
 function updateUserPoints(
   userId,
   memberId,
@@ -766,12 +722,10 @@ function updateUserPoints(
   userData.positions.push(position);
 }
 
-// Bulk update user points
 async function bulkUpdateUserPoints(userPointsMap, tournament, session) {
   const bulkOps = [];
 
   for (const [userKey, userData] of userPointsMap) {
-    // Update total points and category points
     bulkOps.push({
       updateOne: {
         filter: { _id: userData.userId },
@@ -806,7 +760,6 @@ async function bulkUpdateUserPoints(userPointsMap, tournament, session) {
       },
     });
 
-    // If category doesn't exist in categoryPoints, add it
     bulkOps.push({
       updateOne: {
         filter: {
@@ -834,7 +787,6 @@ async function bulkUpdateUserPoints(userPointsMap, tournament, session) {
   }
 }
 
-// Helper to cleanup uploaded file
 function cleanupFile(file) {
   if (file && file.path) {
     try {
@@ -845,7 +797,6 @@ function cleanupFile(file) {
   }
 }
 
-// Check file uniqueness endpoint
 exports.checkFileUniqueness = async (req, res) => {
   try {
     if (!req.file) {
@@ -892,7 +843,7 @@ exports.checkFileUniqueness = async (req, res) => {
     });
   }
 };
-// Keep other functions with modifications for category support
+
 exports.getAllTournaments = async (req, res) => {
   try {
     const tournaments = await Tournament.find()
@@ -900,7 +851,6 @@ exports.getAllTournaments = async (req, res) => {
       .populate("categories", "name type")
       .sort({ date: -1 });
 
-    // Add summary information
     const tournamentsWithSummary = tournaments.map((tournament) => ({
       _id: tournament._id,
       name: tournament.name,
@@ -953,10 +903,8 @@ exports.getTournamentById = async (req, res) => {
       });
     }
 
-    // Group players by category and structure the response
     const categoriesMap = new Map();
 
-    // Initialize categories from tournament categories
     tournament.categories.forEach((cat) => {
       categoriesMap.set(cat._id.toString(), {
         _id: cat._id,
@@ -966,11 +914,9 @@ exports.getTournamentById = async (req, res) => {
       });
     });
 
-    // Track unique player entries for accurate counting
     const uniquePlayerEntries = new Set();
     const uniqueUsersInTournament = new Set();
 
-    // Helper function to get category points
     const getCategoryPoints = (user, categoryId) => {
       if (!user || !user.categoryPoints) return 0;
       
@@ -981,19 +927,16 @@ exports.getTournamentById = async (req, res) => {
       return categoryPoint ? categoryPoint.points : 0;
     };
 
-    // Helper function to get points based on position and category type
     const getPointsForPosition = (position, categoryType) => {
       const mapping = POINTS_MAPPING[categoryType] || POINTS_MAPPING.singles;
       return mapping[position] || 0;
     };
 
-    // Group players by category
     tournament.players.forEach((player) => {
       const categoryId = player.category.toString();
       if (categoriesMap.has(categoryId)) {
         const categoryData = categoriesMap.get(categoryId);
         
-        // Calculate points based on actual category type
         const points1 = getPointsForPosition(player.position, player.categoryType);
         const points2 = player.categoryType === "doubles" ? 
           getPointsForPosition(player.position2 || player.position, player.categoryType) : 0;
@@ -1029,10 +972,8 @@ exports.getTournamentById = async (req, res) => {
         };
         categoryData.players.push(playerEntry);
 
-        // Count this as one player entry (team in doubles, individual in singles)
         uniquePlayerEntries.add(player._id.toString());
 
-        // Track unique users across the tournament
         if (player.user1) {
           uniqueUsersInTournament.add(player.user1._id.toString());
         }
@@ -1042,7 +983,6 @@ exports.getTournamentById = async (req, res) => {
       }
     });
 
-    // Convert map to array and sort players by position
     const categories = Array.from(categoriesMap.values()).map((category) => ({
       ...category,
       players: category.players.sort((a, b) => a.position - b.position),
