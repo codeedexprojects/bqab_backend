@@ -24,6 +24,8 @@ router.post(
   tournamentController.createTournamentFromExcel
 );
 
+
+
 router.delete(
   '/:tournamentId', 
   verifyAdminToken(['admin']), 

@@ -65,7 +65,7 @@ exports.getAllUmpires = async (req, res) => {
       passport: umpire.passport,
       gender: umpire.gender,
       mobileNumber: umpire.mobileNumber,
-      experience: umpire.experience,
+      QID: umpire.QID,
       isActive: umpire.isActive,
       assignedTournamentsCount: umpire.assignedTournaments.length,
       assignedTournaments: umpire.assignedTournaments.map(at => ({
@@ -142,7 +142,7 @@ exports.createUmpire = async (req, res) => {
       passport,
       gender,
       mobileNumber,
-      experience,
+      QID,
     } = req.body;
 
     // Check for duplicate passport if provided
@@ -165,7 +165,7 @@ exports.createUmpire = async (req, res) => {
       passport,
       gender,
       mobileNumber: mobileNumber || [],
-      experience: experience || 0,
+      QID: QID,
     });
 
     await newUmpire.save();
@@ -222,7 +222,7 @@ exports.updateUmpire = async (req, res) => {
       passport,
       gender,
       mobileNumber,   
-      experience,
+      QID,
       isActive
     } = req.body;
 
@@ -253,7 +253,7 @@ exports.updateUmpire = async (req, res) => {
     // Update fields
     const updateFields = {
       name, country, passport, gender, mobileNumber, 
-       experience, isActive
+       QID, isActive
     };
 
     Object.keys(updateFields).forEach(key => {

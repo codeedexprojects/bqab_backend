@@ -19,16 +19,6 @@ const clubSchema = new mongoose.Schema(
     },
     mobileNumbers: {
       type: [String],
-      validate: {
-        validator: function(v) {
-          if (v.length > 3) return false;
-          for (let num of v) {
-            if (!/^[0-9]{10}$/.test(num)) return false;
-          }
-          return true;
-        },
-        message: 'Mobile numbers must be max 3 numbers and each must be 10 digits'
-      },
       default: []
     },
     address: {
@@ -38,12 +28,6 @@ const clubSchema = new mongoose.Schema(
       zipCode: {
         type: String,
         trim: true,
-        validate: {
-          validator: function(v) {
-            return !v || /^[0-9]{5,6}$/.test(v);
-          },
-          message: 'Zip code must be 5-6 digits'
-        }
       },
       country: { type: String, trim: true, default: 'India', maxlength: [50, 'Country cannot exceed 50 characters'] }
     },

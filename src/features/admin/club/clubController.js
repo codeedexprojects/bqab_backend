@@ -44,6 +44,15 @@ exports.getClubById = async (req, res) => {
     });
   } catch (error) {
     console.error('Get Club By ID Error:', error.message);
+    
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid club ID format',
+        errors: [{ message: 'Please provide a valid club ID' }]
+      });
+    }
+    
     res.status(500).json({
       success: false,
       message: 'Server error',
@@ -91,18 +100,36 @@ exports.getClubByClubId = async (req, res) => {
   }
 };
 
-// Create new club with logo
+
 exports.createClub = async (req, res) => {
-  const { name, mobileNumbers, address, isActive } = req.body;
+  let { name, mobileNumbers, address, isActive } = req.body;
 
   try {
-    // Check if logo file exists
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: [{ field: 'logo', message: 'Club logo is required' }]
-      });
+ 
+
+    // Parse mobileNumbers if it's a string (from FormData)
+    if (typeof mobileNumbers === 'string') {
+      try {
+        mobileNumbers = JSON.parse(mobileNumbers);
+      } catch (parseError) {
+        console.error('Mobile numbers parse error:', parseError);
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: [{ field: 'mobileNumbers', message: 'Invalid mobile numbers format' }]
+        });
+      }
+    }
+
+    // Parse address if it's a string (from FormData)
+    if (typeof address === 'string') {
+      try {
+        address = JSON.parse(address);
+      } catch (parseError) {
+        console.error('Address parse error:', parseError);
+        // If address parsing fails, set to empty object
+        address = {};
+      }
     }
 
     // Check for duplicate club name
@@ -117,7 +144,7 @@ exports.createClub = async (req, res) => {
 
     const club = new Club({
       name,
-      logo: req.file.filename, // Store the filename directly like in Product controller
+      logo: req.file.filename,
       mobileNumbers: mobileNumbers || [],
       address: address || {},
       isActive: isActive !== undefined ? isActive : true
@@ -159,9 +186,10 @@ exports.createClub = async (req, res) => {
   }
 };
 
+
 // Update club by ID with logo
 exports.updateClubById = async (req, res) => {
-  const { name, isActive } = req.body;
+  let { name, mobileNumbers, address, isActive } = req.body;
 
   try {
     const club = await Club.findById(req.params.clubId);
@@ -174,7 +202,30 @@ exports.updateClubById = async (req, res) => {
       });
     }
 
-    // Check for duplicate club name (excluding current club)
+    // Parse mobileNumbers if it's a string (from FormData)
+    if (mobileNumbers && typeof mobileNumbers === 'string') {
+      try {
+        mobileNumbers = JSON.parse(mobileNumbers);
+      } catch (parseError) {
+        console.error('Mobile numbers parse error:', parseError);
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: [{ field: 'mobileNumbers', message: 'Invalid mobile numbers format' }]
+        });
+      }
+    }
+
+    // Parse address if it's a string (from FormData)
+    if (address && typeof address === 'string') {
+      try {
+        address = JSON.parse(address);
+      } catch (parseError) {
+        console.error('Address parse error:', parseError);
+        address = undefined;
+      }
+    }
+
     if (name && name !== club.name) {
       const existingClub = await Club.findOne({ name, _id: { $ne: club._id } });
       if (existingClub) {
@@ -193,6 +244,8 @@ exports.updateClubById = async (req, res) => {
 
     // Update allowed fields
     if (name) club.name = name;
+    if (mobileNumbers) club.mobileNumbers = mobileNumbers;
+    if (address) club.address = address;
     if (isActive !== undefined) club.isActive = isActive;
 
     await club.save();
